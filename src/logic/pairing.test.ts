@@ -16,7 +16,7 @@ describe("shuffleParticipants", () => {
 });
 
 describe("isRestrictedPairingName", () => {
-  it("matches any of the 6 restricted keywords as a case-insensitive substring", () => {
+  it("matches any of the 7 restricted keywords as a case-insensitive substring", () => {
     expect(isRestrictedPairingName("Thomas S")).toBe(true);
     expect(isRestrictedPairingName("pak thomas")).toBe(true);
     expect(isRestrictedPairingName("Atiq Rahman")).toBe(true);
@@ -24,6 +24,7 @@ describe("isRestrictedPairingName", () => {
     expect(isRestrictedPairingName("Ade Kurniawan")).toBe(true);
     expect(isRestrictedPairingName("Pak Edi")).toBe(true);
     expect(isRestrictedPairingName("Ilham Pratama")).toBe(true);
+    expect(isRestrictedPairingName("Faldy Ramadhan")).toBe(true);
   });
 
   it("does not match unrelated names", () => {
@@ -61,22 +62,24 @@ describe("pairsFromShuffled", () => {
       { id: "p4", name: "Ade Kurniawan" },
       { id: "p5", name: "Pak Edi" },
       { id: "p6", name: "Ilham Pratama" },
-      { id: "p7", name: "Budi Santoso" },
-      { id: "p8", name: "Andi Wijaya" },
-      { id: "p9", name: "Citra Dewi" },
-      { id: "p10", name: "Dewi Lestari" },
-      { id: "p11", name: "Eka Putra" },
-      { id: "p12", name: "Fajar Nugraha" },
-      { id: "p13", name: "Gilang Ramadhan" },
-      { id: "p14", name: "Hendra Saputra" },
+      { id: "p7", name: "Faldy Ramadhan" },
+      { id: "p8", name: "Budi Santoso" },
+      { id: "p9", name: "Andi Wijaya" },
+      { id: "p10", name: "Citra Dewi" },
+      { id: "p11", name: "Dewi Lestari" },
+      { id: "p12", name: "Eka Putra" },
+      { id: "p13", name: "Fajar Nugraha" },
+      { id: "p14", name: "Gilang Ramadhan" },
+      { id: "p15", name: "Hendra Saputra" },
+      { id: "p16", name: "Indra Kusuma" },
     ];
-    const restrictedIds = new Set(["p1", "p2", "p3", "p4", "p5", "p6"]);
+    const restrictedIds = new Set(["p1", "p2", "p3", "p4", "p5", "p6", "p7"]);
 
     for (let trial = 0; trial < 20; trial++) {
       const shuffled = shuffleParticipants(participants);
       const pairs = pairsFromShuffled(shuffled, participants);
 
-      expect(pairs).toHaveLength(7);
+      expect(pairs).toHaveLength(8);
       expect(new Set(pairs.flat())).toEqual(new Set(shuffled));
 
       for (const [a, b] of pairs) {

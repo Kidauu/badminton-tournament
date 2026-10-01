@@ -1,12 +1,12 @@
 import type { Participant } from "../types/tournament";
 
 /**
- * These 6 people must never end up as each other's doubles partner — any
+ * These 7 people must never end up as each other's doubles partner — any
  * participant whose name CONTAINS one of these words (case-insensitive, so
  * "Thomas S", "Pak Thomas", etc. all still match) counts as that restricted
  * person, no matter how their name is actually typed in the roster.
  */
-const RESTRICTED_PAIRING_KEYWORDS = ["thomas", "atiq", "said", "ade", "edi", "ilham"];
+const RESTRICTED_PAIRING_KEYWORDS = ["thomas", "atiq", "said", "ade", "edi", "ilham", "faldy"];
 
 export function isRestrictedPairingName(name: string): boolean {
   const lower = name.toLowerCase();

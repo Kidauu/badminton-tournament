@@ -1892,10 +1892,17 @@
   width: 1.5px;
 }
 
+.court-motif .court-center-line {
+  height: 1.5px;
+}
+
 .court-motif .court-net {
-  top: 50%;
-  height: 2px;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
   background: #ced5cc;
+  transform: translateX(-50%);
 }
 
 .champion-empty {

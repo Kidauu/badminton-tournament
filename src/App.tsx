@@ -68,7 +68,7 @@ function AppShell() {
         {activeTab === "jadwal" && <ScheduleScreen onNavigate={setActiveTab} />}
         {activeTab === "skor" && <ScoreEntryScreen onNavigate={setActiveTab} />}
         {activeTab === "klasemen" && <StandingsScreen />}
-        {activeTab === "juara" && <ChampionScreen />}
+        {activeTab === "juara" && <ChampionScreen onNavigate={setActiveTab} />}
       </main>
     </div>
   );

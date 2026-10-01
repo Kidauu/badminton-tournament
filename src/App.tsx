@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { TournamentProvider, useTournament } from "./state/TournamentContext";
+import { AppHeader } from "./components/AppHeader";
 import { ParticipantsScreen } from "./screens/ParticipantsScreen";
 import { SpinWheelScreen } from "./screens/SpinWheelScreen/SpinWheelScreen";
 import { TeamsScreen } from "./screens/TeamsScreen";
@@ -9,18 +10,8 @@ import { StandingsScreen } from "./screens/StandingsScreen";
 import { ChampionScreen } from "./screens/ChampionScreen";
 import type { TabId } from "./types/nav";
 
-const TAB_META: { id: TabId; label: string }[] = [
-  { id: "peserta", label: "Peserta" },
-  { id: "undian", label: "Undian" },
-  { id: "tim", label: "Tim" },
-  { id: "jadwal", label: "Bagan" },
-  { id: "skor", label: "Skor" },
-  { id: "klasemen", label: "Klasemen" },
-  { id: "juara", label: "Juara" },
-];
-
 function AppShell() {
-  const { state, dispatch } = useTournament();
+  const { state } = useTournament();
   const hasParticipants = state.participants.length > 0;
   const teamsFormed = state.teams.length;
   const hasSchedule = state.matches.length > 0;
@@ -55,32 +46,21 @@ function AppShell() {
     }
   }, [allDone]);
 
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-
-  function handleReset() {
-    dispatch({ type: "RESET_TOURNAMENT" });
-    hasAutoNavigated.current = false;
-    setActiveTab("peserta");
-    setResetConfirmOpen(false);
-  }
+  // Reset turnamen now lives in the header's overflow menu; detect it here by
+  // watching for the state going back to empty, so the auto-navigate guard
+  // and the active tab both return to a fresh start.
+  const wasEmpty = useRef(!hasParticipants);
+  useEffect(() => {
+    if (!hasParticipants && !wasEmpty.current) {
+      hasAutoNavigated.current = false;
+      setActiveTab("peserta");
+    }
+    wasEmpty.current = !hasParticipants;
+  }, [hasParticipants]);
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <h1 className="app-title">🏸 Turnamen Badminton Ganda Putra</h1>
-      </header>
-      <nav className="tab-nav">
-        {TAB_META.map((tab) => (
-          <button
-            key={tab.id}
-            className={activeTab === tab.id ? "tab-button tab-button-active" : "tab-button"}
-            disabled={!unlocked[tab.id]}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      <AppHeader activeTab={activeTab} unlocked={unlocked} onSelectTab={setActiveTab} />
       <main className="app-main">
         {activeTab === "peserta" && <ParticipantsScreen onNavigate={setActiveTab} />}
         {activeTab === "undian" && <SpinWheelScreen onNavigate={setActiveTab} />}
@@ -90,23 +70,6 @@ function AppShell() {
         {activeTab === "klasemen" && <StandingsScreen />}
         {activeTab === "juara" && <ChampionScreen />}
       </main>
-      <footer className="app-footer">
-        {resetConfirmOpen ? (
-          <span className="reset-confirm">
-            Ini akan menghapus semua peserta, tim, jadwal, dan skor. Lanjutkan?
-            <button className="btn btn-danger btn-small" onClick={handleReset}>
-              Ya, reset
-            </button>
-            <button className="btn btn-ghost btn-small" onClick={() => setResetConfirmOpen(false)}>
-              Batal
-            </button>
-          </span>
-        ) : (
-          <button className="btn btn-ghost btn-small" onClick={() => setResetConfirmOpen(true)}>
-            Reset turnamen
-          </button>
-        )}
-      </footer>
     </div>
   );
 }

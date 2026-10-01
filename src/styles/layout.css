@@ -231,6 +231,20 @@
   margin: 6px 4px;
 }
 
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  background: var(--ink);
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: var(--r-btn);
+  font-size: 13px;
+  box-shadow: var(--shadow-menu);
+  max-width: calc(100vw - 32px);
+}
+
 .overflow-file-input {
   position: absolute;
   width: 1px;
@@ -443,6 +457,11 @@
   color: var(--ink-2);
 }
 
+.score-line-name-draw {
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .score-line-members {
   font-size: 13px;
   color: var(--ink-3);
@@ -547,6 +566,23 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+
+.bracket-card-name {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bracket-card-name-winner {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.bracket-card-name-loser {
+  font-weight: 500;
+  color: var(--ink-2);
 }
 
 .bracket-card-sets {

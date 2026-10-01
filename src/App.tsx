@@ -65,7 +65,7 @@ function AppShell() {
         {activeTab === "peserta" && <ParticipantsScreen onNavigate={setActiveTab} />}
         {activeTab === "undian" && <SpinWheelScreen onNavigate={setActiveTab} />}
         {activeTab === "tim" && <TeamsScreen onNavigate={setActiveTab} />}
-        {activeTab === "jadwal" && <ScheduleScreen />}
+        {activeTab === "jadwal" && <ScheduleScreen onNavigate={setActiveTab} />}
         {activeTab === "skor" && <ScoreEntryScreen />}
         {activeTab === "klasemen" && <StandingsScreen />}
         {activeTab === "juara" && <ChampionScreen />}

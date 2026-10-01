@@ -1,5 +1,7 @@
+import { Download, Printer } from "lucide-react";
 import { computeStandings, teamsInGroup } from "../logic/standings";
 import { scoreLabel } from "../logic/scoring";
+import { Button } from "./Button";
 import { useTournament } from "../state/TournamentContext";
 
 function csvCell(value: string | number): string {
@@ -18,10 +20,9 @@ function download(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+/** CSV + print export. Backup/restore now live in the header's overflow menu. */
 export function ExportSummary() {
-  const { state, dispatch } = useTournament();
-  const importInputRef = useRef<HTMLInputElement>(null);
-  const [backupMessage, setBackupMessage] = useState<string | null>(null);
+  const { state } = useTournament();
   const teamsById = new Map(state.teams.map((team) => [team.id, team]));
   const groupMatches = state.matches.filter((match) => match.stage === "group");
 
@@ -49,51 +50,17 @@ export function ExportSummary() {
         match.winnerTeamId ? `Tim ${teamsById.get(match.winnerTeamId)?.seq ?? "?"}` : "-",
       ]);
     }
-    download("rekap-turnamen-badminton.csv", `\uFEFF${rows.map((row) => row.map(csvCell).join(",")).join("\n")}`, "text/csv;charset=utf-8");
-  }
-
-  function exportBackup() {
-    const date = new Date().toISOString().slice(0, 10);
-    download(`backup-turnamen-badminton-${date}.json`, createBackup(state), "application/json;charset=utf-8");
-    setBackupMessage("Backup berhasil diunduh.");
-  }
-
-  function importBackup(file: File | undefined) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const importedState = typeof reader.result === "string" ? parseBackup(reader.result) : null;
-      if (!importedState) {
-        setBackupMessage("File tidak valid. Pilih file backup JSON dari aplikasi ini.");
-        return;
-      }
-      if (!window.confirm("Restore akan menggantikan seluruh data turnamen yang sedang terbuka. Lanjutkan?")) return;
-      dispatch({ type: "IMPORT_TOURNAMENT", state: importedState });
-      setBackupMessage("Backup berhasil dipulihkan.");
-    };
-    reader.onerror = () => setBackupMessage("File backup tidak dapat dibaca.");
-    reader.readAsText(file);
+    download("rekap-turnamen-badminton.csv", `﻿${rows.map((row) => row.map(csvCell).join(",")).join("\n")}`, "text/csv;charset=utf-8");
   }
 
   return (
-    <div className="export-actions">
-      <button className="btn btn-primary" onClick={exportCsv}>Unduh rekap CSV</button>
-      <button className="btn btn-ghost" onClick={() => window.print()}>Cetak / simpan PDF</button>
-      <button className="btn btn-ghost" onClick={exportBackup}>Backup data JSON</button>
-      <button className="btn btn-ghost" onClick={() => importInputRef.current?.click()}>Restore backup</button>
-      <input
-        ref={importInputRef}
-        className="backup-file-input"
-        type="file"
-        accept="application/json,.json"
-        onChange={(event) => {
-          importBackup(event.target.files?.[0]);
-          event.target.value = "";
-        }}
-      />
-      {backupMessage && <p className="backup-message" role="status">{backupMessage}</p>}
-    </div>
+    <>
+      <Button variant="secondary" icon={<Printer size={16} />} onClick={() => window.print()}>
+        Cetak PDF
+      </Button>
+      <Button variant="primary" icon={<Download size={16} />} onClick={exportCsv}>
+        Unduh rekap CSV
+      </Button>
+    </>
   );
 }
-import { useRef, useState } from "react";
-import { createBackup, parseBackup } from "../logic/backup";

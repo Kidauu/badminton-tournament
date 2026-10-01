@@ -1952,9 +1952,8 @@
   width: 100%;
   border-bottom: 2px solid var(--ink);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding-top: 14px;
   font-family: var(--font-mono);
   font-weight: 700;
 }

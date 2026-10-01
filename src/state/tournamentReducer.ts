@@ -174,7 +174,7 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
         name,
       }));
       const shuffled = shuffleParticipants(participants);
-      const pendingPairs = pairsFromShuffled(shuffled);
+      const pendingPairs = pairsFromShuffled(shuffled, participants);
       return { participants, pendingPairs, teams: [], pendingGroupSlots: [], groupAssignments: [], manualGroupRankings: [], matches: [], byes: [] };
     }
 

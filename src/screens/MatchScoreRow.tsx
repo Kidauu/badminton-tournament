@@ -1,13 +1,13 @@
-import { useState } from "react";
-import { goldenSetRequired, outcomeFromScores, scoreLabel, scoreValidationMessage } from "../logic/scoring";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Pencil } from "lucide-react";
+import { outcomeFromScores } from "../logic/scoring";
+import { scoreEditorMessage } from "../logic/scoreEditorMessage";
 import { useTournament } from "../state/TournamentContext";
-import type { Match, MatchSetScores } from "../types/tournament";
-
-interface MatchScoreRowProps {
-  match: Match;
-  teamALabel: string;
-  teamBLabel: string;
-}
+import { ScoreLine, cellsFromMatch } from "../components/ScoreLine";
+import { ResultChip } from "../components/ResultChip";
+import { Button } from "../components/Button";
+import { teamPlayerNames } from "../logic/format";
+import type { Match, MatchSetScores, Team } from "../types/tournament";
 
 type ScoreDraft = { a: string; b: string }[];
 
@@ -42,15 +42,36 @@ function hasDownstreamResults(match: Match, allMatches: Match[]): boolean {
   return anyDownstream(match);
 }
 
-export function MatchScoreRow({ match, teamALabel, teamBLabel }: MatchScoreRowProps) {
-  const { state, dispatch } = useTournament();
-  const [editing, setEditing] = useState(match.result === null);
+function resultChipInfo(match: Match, teamsById: Map<string, Team>): { text: string; tone: "win" | "neutral" } {
+  if (!match.result) return { text: "Belum diisi", tone: "neutral" };
+  if (match.result === "1-1") return { text: "Imbang 1–1", tone: "neutral" };
+  const winnerLabel = `Tim ${teamsById.get(match.winnerTeamId!)?.seq ?? "?"}`;
+  if (match.stage === "semifinal") return { text: `${winnerLabel} ke final`, tone: "win" };
+  if (match.stage === "final") return { text: `${winnerLabel} juara`, tone: "win" };
+  if (match.stage === "third_place") return { text: `${winnerLabel} juara 3`, tone: "win" };
+  return { text: `${winnerLabel} menang ${match.result}`, tone: "win" };
+}
+
+interface ScoreEditorPanelProps {
+  match: Match;
+  teamALabel: string;
+  teamBLabel: string;
+  onClose: () => void;
+}
+
+function ScoreEditorPanel({ match, teamALabel, teamBLabel, onClose }: ScoreEditorPanelProps) {
+  const { dispatch } = useTournament();
   const [draft, setDraft] = useState<ScoreDraft>(() => initialDraft(match));
+  const firstInputRef = useRef<HTMLInputElement>(null);
+  const isGroup = match.stage === "group";
+
+  useEffect(() => {
+    firstInputRef.current?.focus();
+  }, []);
+
   const scores = draftToScores(draft);
   const outcome = outcomeFromScores(match.stage, scores);
-  const validationMessage = scoreValidationMessage(match.stage, scores);
-  const isKnockout = match.stage === "semifinal" || match.stage === "final" || match.stage === "third_place";
-  const needsGoldenSet = isKnockout && goldenSetRequired(scores);
+  const message = scoreEditorMessage(match.stage, scores, teamALabel, teamBLabel);
 
   function updateScore(setIndex: number, side: "a" | "b", value: string) {
     setDraft((current) => current.map((score, index) => (index === setIndex ? { ...score, [side]: value } : score)));
@@ -59,57 +80,150 @@ export function MatchScoreRow({ match, teamALabel, teamBLabel }: MatchScoreRowPr
   function submit() {
     if (!outcome) return;
     dispatch({ type: "RECORD_SCORES", matchId: match.id, setScores: scores });
-    setEditing(false);
+    onClose();
   }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submit();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+    }
+  }
+
+  return (
+    <div className="score-editor-panel" onKeyDown={handleKeyDown}>
+      <p className="score-editor-title">
+        Urutan skor: {teamALabel} – {teamBLabel}
+      </p>
+      <div className="score-editor-sets">
+        {[0, 1].map((setIndex) => (
+          <div className="score-editor-set" key={setIndex}>
+            <span className="score-editor-set-label">Set {setIndex + 1}</span>
+            <div className="score-editor-set-inputs">
+              <input
+                ref={setIndex === 0 ? firstInputRef : undefined}
+                className="field-input field-input-score"
+                type="number"
+                inputMode="numeric"
+                aria-label={`Skor set ${setIndex + 1} ${teamALabel}`}
+                value={draft[setIndex].a}
+                onChange={(event) => updateScore(setIndex, "a", event.target.value)}
+              />
+              <span aria-hidden="true">–</span>
+              <input
+                className="field-input field-input-score"
+                type="number"
+                inputMode="numeric"
+                aria-label={`Skor set ${setIndex + 1} ${teamBLabel}`}
+                value={draft[setIndex].b}
+                onChange={(event) => updateScore(setIndex, "b", event.target.value)}
+              />
+            </div>
+          </div>
+        ))}
+        {!isGroup && (
+          <div className="score-editor-set">
+            <span className="score-editor-set-label">Set 3 · penentu</span>
+            <div className="score-editor-set-inputs">
+              <input
+                className="field-input field-input-score"
+                type="number"
+                inputMode="numeric"
+                aria-label={`Skor set 3 ${teamALabel}`}
+                value={draft[2].a}
+                onChange={(event) => updateScore(2, "a", event.target.value)}
+              />
+              <span aria-hidden="true">–</span>
+              <input
+                className="field-input field-input-score"
+                type="number"
+                inputMode="numeric"
+                aria-label={`Skor set 3 ${teamBLabel}`}
+                value={draft[2].b}
+                onChange={(event) => updateScore(2, "b", event.target.value)}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+      <p className={`field-status ${message.tone === "valid" ? "field-status-valid" : "field-status-invalid"}`} role="status">
+        {message.text}
+      </p>
+      <div className="score-editor-actions">
+        <Button variant="primary" disabled={!outcome} onClick={submit}>
+          Simpan skor
+        </Button>
+        <Button variant="secondary" onClick={onClose}>
+          Batal
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface MatchScoreRowProps {
+  match: Match;
+  code: string;
+  teamsById: Map<string, Team>;
+  isOpen: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+}
+
+export function MatchScoreRow({ match, code, teamsById, isOpen, onOpen, onClose }: MatchScoreRowProps) {
+  const { state } = useTournament();
+  const teamA = match.teamAId ? teamsById.get(match.teamAId) : undefined;
+  const teamB = match.teamBId ? teamsById.get(match.teamBId) : undefined;
+  if (!teamA || !teamB) return null;
+
+  const cellCount = match.stage === "group" ? 2 : 3;
+  const isDraw = match.result === "1-1";
+  const [namesA, namesB] = [teamPlayerNames(teamA, state.participants), teamPlayerNames(teamB, state.participants)];
+  const chip = resultChipInfo(match, teamsById);
 
   function handleEditClick() {
     if (hasDownstreamResults(match, state.matches)) {
       const confirmed = window.confirm("Mengubah skor pertandingan ini akan menghapus hasil babak berikutnya yang sudah tercatat. Lanjutkan?");
       if (!confirmed) return;
     }
-    setDraft(initialDraft(match));
-    setEditing(true);
-  }
-
-  if (!editing && match.result) {
-    const winnerLabel = match.winnerTeamId === match.teamAId ? teamALabel : teamBLabel;
-    const scoreText = (match.setScores ?? []).map((score) => (score ? scoreLabel(score) : null)).filter(Boolean).join(", ");
-    const resultLabel = match.result === "1-1" ? "Imbang 1-1 — masing-masing 1 poin" : `${winnerLabel} menang ${match.result}`;
-    return (
-      <li className="match-score-row">
-        <span className="match-teams">{teamALabel} vs {teamBLabel}</span>
-        <span className="match-result-badge" data-result={match.result}>{resultLabel}{scoreText ? ` (${scoreText})` : ""}</span>
-        <button className="btn btn-ghost" onClick={handleEditClick}>Edit</button>
-      </li>
-    );
+    onOpen();
   }
 
   return (
-    <li className="match-score-row match-score-row-editing">
-      <span className="match-teams">{teamALabel} vs {teamBLabel}</span>
-      {[0, 1].map((setIndex) => (
-        <div className="score-input-grid" key={setIndex}>
-          <span>Set {setIndex + 1}</span>
-          <label>{teamALabel}<input aria-invalid={Boolean(validationMessage)} type="number" inputMode="numeric" min="0" max="30" value={draft[setIndex].a} onChange={(event) => updateScore(setIndex, "a", event.target.value)} /></label>
-          <span className="vs">-</span>
-          <label>{teamBLabel}<input aria-invalid={Boolean(validationMessage)} type="number" inputMode="numeric" min="0" max="30" value={draft[setIndex].b} onChange={(event) => updateScore(setIndex, "b", event.target.value)} /></label>
-        </div>
-      ))}
-      {needsGoldenSet && (
-        <div className="score-input-grid score-input-golden">
-          <span>Golden set (15)</span>
-          <label>{teamALabel}<input aria-invalid={Boolean(validationMessage)} type="number" inputMode="numeric" min="0" max="15" value={draft[2].a} onChange={(event) => updateScore(2, "a", event.target.value)} /></label>
-          <span className="vs">-</span>
-          <label>{teamBLabel}<input aria-invalid={Boolean(validationMessage)} type="number" inputMode="numeric" min="0" max="15" value={draft[2].b} onChange={(event) => updateScore(2, "b", event.target.value)} /></label>
-        </div>
+    <li className="score-row">
+      <span className="score-row-code mono-num">{code}</span>
+      <div className="score-row-lines">
+        <ScoreLine
+          name={`Tim ${teamA.seq}`}
+          members={namesA.join(" & ")}
+          isWinner={match.winnerTeamId === teamA.id}
+          isDraw={isDraw}
+          cells={cellsFromMatch(match, "A", cellCount)}
+        />
+        <ScoreLine
+          name={`Tim ${teamB.seq}`}
+          members={namesB.join(" & ")}
+          isWinner={match.winnerTeamId === teamB.id}
+          isDraw={isDraw}
+          cells={cellsFromMatch(match, "B", cellCount)}
+        />
+      </div>
+      <div className="score-row-actions">
+        <ResultChip text={chip.text} tone={chip.tone} rowFit />
+        {match.result ? (
+          <Button iconOnly variant="secondary" icon={<Pencil size={16} />} aria-label={`Ubah skor ${code}`} onClick={handleEditClick} />
+        ) : (
+          <Button variant="secondary" onClick={handleEditClick}>
+            Isi skor
+          </Button>
+        )}
+      </div>
+      {isOpen && (
+        <ScoreEditorPanel match={match} teamALabel={`Tim ${teamA.seq}`} teamBLabel={`Tim ${teamB.seq}`} onClose={onClose} />
       )}
-      <span className="score-rule">
-        {isKnockout
-          ? "Set reguler: 21 poin (selisih 2, maksimal 30). Jika 1-1, golden set: lebih dulu 15 poin."
-          : "Set reguler: 21 poin (selisih 2, maksimal 30). Hasil dua set menentukan 2-0 atau 1-1."}
-      </span>
-      {validationMessage && <p className="score-validation" role="alert">⚠️ {validationMessage}</p>}
-      <button className="btn btn-primary" disabled={!outcome} onClick={submit}>Simpan hasil</button>
     </li>
   );
 }

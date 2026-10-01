@@ -6,24 +6,13 @@ import { MatchOperations, MatchStatusCell } from "../components/MatchOperations"
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { BracketMatchCard } from "../components/BracketMatchCard";
-import type { ScoreLineCell } from "../components/ScoreLine";
+import { cellsFromMatch } from "../components/ScoreLine";
 import { useTournament } from "../state/TournamentContext";
 import type { TabId } from "../types/nav";
 import type { Match, Team } from "../types/tournament";
 
 function teamLabel(teamId: string | null, teamsById: Map<string, Team>, fallback: string): string {
   return teamId ? `Tim ${teamsById.get(teamId)?.seq ?? "?"}` : fallback;
-}
-
-function setCells(match: Match, side: "A" | "B"): ScoreLineCell[] {
-  const scores = match.setScores ?? [];
-  return [0, 1, 2].map((i) => {
-    const s = scores[i];
-    if (!s) return { value: null, won: false };
-    const mine = side === "A" ? s.teamAScore : s.teamBScore;
-    const theirs = side === "A" ? s.teamBScore : s.teamAScore;
-    return { value: mine, won: mine > theirs };
-  });
 }
 
 function buildSide(
@@ -38,7 +27,7 @@ function buildSide(
   const team = teamsById.get(teamId);
   if (!team) return null;
   const [a, b] = teamPlayerNames(team, participants);
-  return { seed, name: `Tim ${team.seq}`, members: `${a} & ${b}`, cells: setCells(match, side) };
+  return { seed, name: `Tim ${team.seq}`, members: `${a} & ${b}`, cells: cellsFromMatch(match, side, 3) };
 }
 
 function formatScheduleTime(value?: string): string {

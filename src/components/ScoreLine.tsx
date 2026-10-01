@@ -1,8 +1,21 @@
 import { Check } from "lucide-react";
+import type { Match } from "../types/tournament";
 
 export interface ScoreLineCell {
   value: number | null;
   won: boolean;
+}
+
+/** Reads one side's per-set scores from a match, padded to `cellCount` so group (2) and knockout (3) rows line up. */
+export function cellsFromMatch(match: Match | undefined, side: "A" | "B", cellCount: 2 | 3): ScoreLineCell[] {
+  const scores = match?.setScores ?? [];
+  return Array.from({ length: cellCount }, (_, i) => {
+    const s = scores[i];
+    if (!s) return { value: null, won: false };
+    const mine = side === "A" ? s.teamAScore : s.teamBScore;
+    const theirs = side === "A" ? s.teamBScore : s.teamAScore;
+    return { value: mine, won: mine > theirs };
+  });
 }
 
 interface ScoreLineProps {

@@ -66,7 +66,7 @@ function AppShell() {
         {activeTab === "undian" && <SpinWheelScreen onNavigate={setActiveTab} />}
         {activeTab === "tim" && <TeamsScreen onNavigate={setActiveTab} />}
         {activeTab === "jadwal" && <ScheduleScreen onNavigate={setActiveTab} />}
-        {activeTab === "skor" && <ScoreEntryScreen />}
+        {activeTab === "skor" && <ScoreEntryScreen onNavigate={setActiveTab} />}
         {activeTab === "klasemen" && <StandingsScreen />}
         {activeTab === "juara" && <ChampionScreen />}
       </main>

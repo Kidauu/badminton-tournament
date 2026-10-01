@@ -682,14 +682,6 @@
   padding: 0;
 }
 
-.field-label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--ink-3);
-}
-
 /* ====================== Avatar ====================== */
 
 .avatar {
@@ -1348,12 +1340,6 @@
 
 .bracket-connector-2-active {
   background: var(--court);
-}
-
-.bracket-col-final {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
 }
 
 .champion-slot {

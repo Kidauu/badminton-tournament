@@ -1,43 +1,53 @@
 :root {
-  --color-court-green: #0b6e4f;
-  --color-court-green-dark: #084f39;
-  --color-accent-yellow: #ffd23f;
-  --color-white: #ffffff;
-  --color-ink: #10241c;
-  --color-muted: #5b6b64;
-  --color-surface: #ffffff;
-  --color-surface-alt: #f2f7f4;
-  --color-border: #d8e6df;
-  --color-win: #12a86b;
-  --color-draw: #d98c00;
-  --color-loss: #e5484d;
+  /* Netral */
+  --ink: #111813;
+  --ink-2: #4b544e;
+  --ink-3: #69726c;
+  --line: #e4e7e2;
+  --line-strong: #cfd4ce;
+  --fill: #eef1ec;
+  --fill-2: #f7f8f6;
+  --bg: #f5f6f3;
+  --surface: #ffffff;
 
-  --font-size-base: 1.125rem;
-  --font-size-lg: 1.5rem;
-  --font-size-xl: 2rem;
-  --font-size-2xl: 3rem;
-  --font-size-3xl: 4.5rem;
+  /* Aksen: hanya untuk makna (menang, lolos, juara, aktif) */
+  --court: #0e6b47;
+  --court-hover: #0a5236;
+  --court-tint: #e3f1e9;
+  --court-on-dark: #cfe8da;
+  --danger: #b42318;
+  --medal-gold: #d4a72c;
+  --medal-silver: #a7afb3;
+  --medal-bronze: #b97a4e;
 
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 16px;
-  --space-4: 24px;
-  --space-5: 32px;
-  --space-6: 48px;
+  /* Tipografi */
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  --radius-sm: 8px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
-  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.08);
+  /* Radius */
+  --r-input: 8px;
+  --r-btn: 10px;
+  --r-row: 12px;
+  --r-card: 14px;
+  --r-panel: 16px;
+  --r-pill: 999px;
+
+  /* Spasi (kelipatan 4) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 28px;
+  --sp-8: 32px;
+  --sp-9: 40px;
+
+  /* Layout */
+  --container: 1200px;
+  --gutter: clamp(16px, 4vw, 32px);
+  --shadow-menu: 0 16px 40px rgba(17, 24, 19, 0.12);
+
+  /* Target sentuh */
   --touch-target-min: 44px;
-}
-
-@media (min-width: 768px) {
-  :root {
-    --font-size-base: 1.25rem;
-    --font-size-lg: 1.75rem;
-    --font-size-xl: 2.5rem;
-    --font-size-2xl: 3.5rem;
-    --font-size-3xl: 5.5rem;
-  }
 }

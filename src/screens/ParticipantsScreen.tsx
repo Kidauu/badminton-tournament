@@ -1,5 +1,9 @@
 import { useState, type ClipboardEvent } from "react";
+import { Lock, ArrowRight } from "lucide-react";
 import { useTournament } from "../state/TournamentContext";
+import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
+import { Avatar } from "../components/Avatar";
 import type { TabId } from "../types/nav";
 
 const DEFAULT_PARTICIPANT_COUNT = 14;
@@ -39,7 +43,9 @@ export function ParticipantsScreen({ onNavigate }: { onNavigate: (tab: TabId) =>
       let needed = index + lines.length;
       if (needed % 2 !== 0) needed += 1;
       while (next.length < needed) next.push("");
-      lines.forEach((line, i) => { next[index + i] = line; });
+      lines.forEach((line, i) => {
+        next[index + i] = line;
+      });
       return next;
     });
   }
@@ -65,44 +71,77 @@ export function ParticipantsScreen({ onNavigate }: { onNavigate: (tab: TabId) =>
   }
 
   if (locked) {
+    const totalTeams = state.teams.length;
+    const teamSeqByPlayerId = new Map<string, number>();
+    for (const team of state.teams) {
+      teamSeqByPlayerId.set(team.playerAId, team.seq);
+      teamSeqByPlayerId.set(team.playerBId, team.seq);
+    }
+
     return (
-      <section className="screen">
-        <h1>Peserta</h1>
-        <p>{state.participants.length} peserta sudah dikunci karena tim sudah terbentuk. Reset turnamen untuk mengubah daftar peserta.</p>
-        <ul className="participants-readonly-grid">
-          {state.participants.map((p, i) => (
-            <li key={p.id}>
-              {i + 1}. {p.name}
-            </li>
-          ))}
-        </ul>
+      <section>
+        <PageHeader
+          title="Peserta"
+          countPill={`${state.participants.length} pemain`}
+          description={`Semua pemain sudah dipasangkan menjadi ${totalTeams} tim ganda putra.`}
+          actions={
+            <Button variant="primary" icon={<ArrowRight size={16} />} onClick={() => onNavigate("undian")}>
+              Lihat hasil undian
+            </Button>
+          }
+        />
+
+        <div className="lock-banner">
+          <span className="lock-banner-icon">
+            <Lock size={18} />
+          </span>
+          <div>
+            <p className="lock-banner-title">Daftar peserta dikunci</p>
+            <p className="lock-banner-text">Tim sudah terbentuk. Untuk mengubah daftar, reset turnamen lewat menu di kanan atas.</p>
+          </div>
+        </div>
+
+        <div className="participants-grid">
+          {state.participants.map((p) => {
+            const seq = teamSeqByPlayerId.get(p.id);
+            return (
+              <div className="participant-card" key={p.id}>
+                <Avatar name={p.name} size={36} />
+                <span className="participant-card-name">{p.name}</span>
+                {seq && <span className="participant-card-team">Tim {seq}</span>}
+              </div>
+            );
+          })}
+        </div>
       </section>
     );
   }
 
   return (
-    <section className="screen">
-      <h1>Peserta</h1>
-      <p>Masukkan {names.length} nama peserta. Nama harus unik dan tidak boleh kosong. Jumlah peserta harus genap. Tips: tempel (paste) daftar nama sekaligus (satu nama per baris) ke salah satu kotak di bawah.</p>
-      <div className="participant-count-actions">
-        <button
-          className="btn btn-ghost btn-small"
-          onClick={removeParticipants}
-          disabled={names.length <= MIN_PARTICIPANT_COUNT}
-        >
+    <section>
+      <PageHeader
+        title="Peserta"
+        countPill={`${names.length} pemain`}
+        description={`Masukkan ${names.length} nama peserta. Nama harus unik dan tidak boleh kosong. Jumlah peserta harus genap. Tips: tempel (paste) daftar nama sekaligus (satu nama per baris) ke salah satu kotak di bawah.`}
+      />
+
+      <div className="participant-count-row">
+        <Button small onClick={removeParticipants} disabled={names.length <= MIN_PARTICIPANT_COUNT}>
           − 2 peserta
-        </button>
-        <span className="participant-count-label">{names.length} peserta</span>
-        <button className="btn btn-ghost btn-small" onClick={addParticipants}>
+        </Button>
+        <span className="participant-count-label mono-num">{names.length} peserta</span>
+        <Button small onClick={addParticipants}>
           + 2 peserta
-        </button>
+        </Button>
       </div>
+
       <div className="participant-form-grid">
         {names.map((name, i) => (
           <div className="participant-field" key={i}>
             <label htmlFor={`peserta-${i}`}>Peserta {i + 1}</label>
             <input
               id={`peserta-${i}`}
+              className="field-input"
               type="text"
               value={name}
               onChange={(e) => updateName(i, e.target.value)}
@@ -112,6 +151,7 @@ export function ParticipantsScreen({ onNavigate }: { onNavigate: (tab: TabId) =>
           </div>
         ))}
       </div>
+
       {errors.length > 0 && (
         <ul className="form-error-list">
           {errors.map((err) => (
@@ -119,11 +159,10 @@ export function ParticipantsScreen({ onNavigate }: { onNavigate: (tab: TabId) =>
           ))}
         </ul>
       )}
-      <div className="spin-wheel-actions">
-        <button className="btn btn-primary" onClick={handleSubmit}>
-          Simpan &amp; Mulai Undian
-        </button>
-      </div>
+
+      <Button variant="primary" onClick={handleSubmit}>
+        Simpan &amp; Mulai Undian
+      </Button>
     </section>
   );
 }

@@ -134,6 +134,34 @@ describe("pairsFromShuffled", () => {
     }
   });
 
+  it("reveals the Risky/Ilham pair in the middle of the spin order, never first or last", () => {
+    const participants: Participant[] = [
+      { id: "p1", name: "Thomas Wijaya" },
+      { id: "p2", name: "Atiq Rahman" },
+      { id: "p3", name: "Muhammad Said" },
+      { id: "p4", name: "Ade Kurniawan" },
+      { id: "p5", name: "Pak Edi" },
+      { id: "p6", name: "Ilham Pratama" },
+      { id: "p7", name: "Faldy Ramadhan" },
+      { id: "p8", name: "Risky Daulay" },
+      { id: "p9", name: "Andi Wijaya" },
+      { id: "p10", name: "Citra Dewi" },
+      { id: "p11", name: "Dewi Lestari" },
+      { id: "p12", name: "Eka Putra" },
+      { id: "p13", name: "Fajar Nugraha" },
+      { id: "p14", name: "Gilang Ramadhan" },
+    ];
+
+    for (let trial = 0; trial < 20; trial++) {
+      const shuffled = shuffleParticipants(participants);
+      const pairs = pairsFromShuffled(shuffled, participants);
+      const forcedIndex = pairs.findIndex(([a, b]) => (a === "p8" && b === "p6") || (a === "p6" && b === "p8"));
+
+      expect(forcedIndex).toBeGreaterThan(0);
+      expect(forcedIndex).toBeLessThan(pairs.length - 1);
+    }
+  });
+
   it("does not force a pairing when only Risky or only Ilham is present", () => {
     const withoutIlham: Participant[] = [
       { id: "p1", name: "Risky Daulay" },

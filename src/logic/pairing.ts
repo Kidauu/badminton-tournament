@@ -48,19 +48,22 @@ export function shuffleParticipants(participants: Participant[]): string[] {
  * the shuffle's randomness. Only pairs two restricted people together if
  * there are literally more restricted people than non-restricted partners
  * left to go around (mathematically unavoidable at that point).
+ *
+ * If a Risky/Ilham forced pair exists, it's slotted into the middle of the
+ * reveal order (never the first or last spin) so the wheel doesn't give it
+ * away immediately or make it an anticlimactic final reveal.
  */
 export function pairsFromShuffled(shuffledIds: string[], participants: Participant[]): [string, string][] {
   const nameById = new Map(participants.map((p) => [p.id, p.name]));
   const isRestricted = (id: string) => isRestrictedPairingName(nameById.get(id) ?? "");
 
-  const pairs: [string, string][] = [];
   const forcedPair = findForcedPair(shuffledIds, nameById);
   const pool = forcedPair ? shuffledIds.filter((id) => id !== forcedPair[0] && id !== forcedPair[1]) : shuffledIds;
-  if (forcedPair) pairs.push(forcedPair);
 
   const restricted = pool.filter(isRestricted);
   const unrestricted = pool.filter((id) => !isRestricted(id));
 
+  const pairs: [string, string][] = [];
   const strandedRestricted: string[] = [];
 
   for (const id of restricted) {
@@ -75,6 +78,14 @@ export function pairsFromShuffled(shuffledIds: string[], participants: Participa
 
   while (unrestricted.length >= 2) {
     pairs.push([unrestricted.shift()!, unrestricted.shift()!]);
+  }
+
+  if (forcedPair) {
+    // With N other pairs, a true middle slot (neither index 0 nor the last
+    // index once inserted) only exists when N >= 2. Below that there's no
+    // middle to put it in, so it falls back to going last.
+    const insertAt = pairs.length >= 2 ? Math.min(Math.max(Math.floor(pairs.length / 2), 1), pairs.length - 1) : pairs.length;
+    pairs.splice(insertAt, 0, forcedPair);
   }
 
   return pairs;

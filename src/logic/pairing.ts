@@ -13,6 +13,22 @@ export function isRestrictedPairingName(name: string): boolean {
   return RESTRICTED_PAIRING_KEYWORDS.some((keyword) => lower.includes(keyword));
 }
 
+/**
+ * Risky and Ilham must always be partners whenever both are entered — this
+ * overrides the restricted list above (Ilham is in it, but pairing with Risky
+ * specifically is the one case that's required rather than forbidden).
+ */
+const FORCED_PAIR_KEYWORDS: [string, string] = ["risky", "ilham"];
+
+function findForcedPair(shuffledIds: string[], nameById: Map<string, string>): [string, string] | null {
+  const [keywordA, keywordB] = FORCED_PAIR_KEYWORDS;
+  const matching = (keyword: string) => shuffledIds.find((id) => (nameById.get(id) ?? "").toLowerCase().includes(keyword));
+  const idA = matching(keywordA);
+  const idB = matching(keywordB);
+  if (!idA || !idB || idA === idB) return null;
+  return [idA, idB];
+}
+
 /** Fisher-Yates shuffle. The result is the ONLY random moment — everything
  * downstream (which 2 names a given wheel spin reveals) is derived from this
  * fixed order. The wheel animation itself must never introduce randomness. */
@@ -37,10 +53,14 @@ export function pairsFromShuffled(shuffledIds: string[], participants: Participa
   const nameById = new Map(participants.map((p) => [p.id, p.name]));
   const isRestricted = (id: string) => isRestrictedPairingName(nameById.get(id) ?? "");
 
-  const restricted = shuffledIds.filter(isRestricted);
-  const unrestricted = shuffledIds.filter((id) => !isRestricted(id));
-
   const pairs: [string, string][] = [];
+  const forcedPair = findForcedPair(shuffledIds, nameById);
+  const pool = forcedPair ? shuffledIds.filter((id) => id !== forcedPair[0] && id !== forcedPair[1]) : shuffledIds;
+  if (forcedPair) pairs.push(forcedPair);
+
+  const restricted = pool.filter(isRestricted);
+  const unrestricted = pool.filter((id) => !isRestricted(id));
+
   const strandedRestricted: string[] = [];
 
   for (const id of restricted) {

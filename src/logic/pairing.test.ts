@@ -105,4 +105,45 @@ describe("pairsFromShuffled", () => {
     const restrictedPairCount = pairs.filter(([a, b]) => a.startsWith("p") && b.startsWith("p") && [a, b].every((id) => ["p1", "p2", "p3", "p4"].includes(id))).length;
     expect(restrictedPairCount).toBe(1);
   });
+
+  it("always pairs Risky with Ilham when both are present", () => {
+    const participants: Participant[] = [
+      { id: "p1", name: "Thomas Wijaya" },
+      { id: "p2", name: "Atiq Rahman" },
+      { id: "p3", name: "Muhammad Said" },
+      { id: "p4", name: "Ade Kurniawan" },
+      { id: "p5", name: "Pak Edi" },
+      { id: "p6", name: "Ilham Pratama" },
+      { id: "p7", name: "Faldy Ramadhan" },
+      { id: "p8", name: "Risky Daulay" },
+      { id: "p9", name: "Andi Wijaya" },
+      { id: "p10", name: "Citra Dewi" },
+      { id: "p11", name: "Dewi Lestari" },
+      { id: "p12", name: "Eka Putra" },
+      { id: "p13", name: "Fajar Nugraha" },
+      { id: "p14", name: "Gilang Ramadhan" },
+    ];
+
+    for (let trial = 0; trial < 20; trial++) {
+      const shuffled = shuffleParticipants(participants);
+      const pairs = pairsFromShuffled(shuffled, participants);
+
+      expect(pairs).toHaveLength(7);
+      expect(new Set(pairs.flat())).toEqual(new Set(shuffled));
+      expect(pairs).toContainEqual(["p8", "p6"]);
+    }
+  });
+
+  it("does not force a pairing when only Risky or only Ilham is present", () => {
+    const withoutIlham: Participant[] = [
+      { id: "p1", name: "Risky Daulay" },
+      { id: "p2", name: "Budi Santoso" },
+      { id: "p3", name: "Andi Wijaya" },
+      { id: "p4", name: "Citra Dewi" },
+    ];
+    const shuffled = shuffleParticipants(withoutIlham);
+    const pairs = pairsFromShuffled(shuffled, withoutIlham);
+    expect(pairs).toHaveLength(2);
+    expect(new Set(pairs.flat())).toEqual(new Set(shuffled));
+  });
 });

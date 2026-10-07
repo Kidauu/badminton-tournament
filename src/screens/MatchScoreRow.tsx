@@ -68,7 +68,7 @@ interface ScoreEditorPanelProps {
 }
 
 function ScoreEditorPanel({ match, teamALabel, teamBLabel, onClose }: ScoreEditorPanelProps) {
-  const { dispatch } = useTournament();
+  const { state, dispatch } = useTournament();
   const [draft, setDraft] = useState<ScoreDraft>(() => initialDraft(match));
   const firstInputRef = useRef<HTMLInputElement>(null);
   const isGroup = match.stage === "group";
@@ -95,6 +95,8 @@ function ScoreEditorPanel({ match, teamALabel, teamBLabel, onClose }: ScoreEdito
 
   function submit() {
     if (resetRequested) {
+      const bracketSeeded = isGroup && state.matches.some((item) => item.stage !== "group" && (item.teamAId || item.teamBId || item.result));
+      if (bracketSeeded && !window.confirm("Mereset skor pertandingan grup akan mengosongkan bagan gugur (semifinal, final, juara 3) dan peringkat manual grup. Lanjutkan?")) return;
       dispatch({ type: "RESET_MATCH_SCORES", matchId: match.id });
       onClose();
       return;

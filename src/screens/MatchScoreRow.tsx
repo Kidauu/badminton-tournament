@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, RotateCcw } from "lucide-react";
 import { outcomeFromScores } from "../logic/scoring";
 import { scoreEditorMessage } from "../logic/scoreEditorMessage";
 import { useTournament } from "../state/TournamentContext";
@@ -10,6 +10,14 @@ import { teamPlayerNames } from "../logic/format";
 import type { Match, MatchSetScores, Team } from "../types/tournament";
 
 type ScoreDraft = { a: string; b: string }[];
+
+function zeroDraft(): ScoreDraft {
+  return Array.from({ length: 3 }, () => ({ a: "0", b: "0" }));
+}
+
+function isZeroDraft(draft: ScoreDraft): boolean {
+  return draft.every(({ a, b }) => a.trim() !== "" && b.trim() !== "" && Number(a) === 0 && Number(b) === 0);
+}
 
 function initialDraft(match: Match): ScoreDraft {
   return (match.setScores ?? [null, null, null]).map((score) => ({
@@ -71,13 +79,26 @@ function ScoreEditorPanel({ match, teamALabel, teamBLabel, onClose }: ScoreEdito
 
   const scores = draftToScores(draft);
   const outcome = outcomeFromScores(match.stage, scores);
-  const message = scoreEditorMessage(match.stage, scores, teamALabel, teamBLabel);
+  const resetRequested = isZeroDraft(draft);
+  const message = resetRequested
+    ? { tone: "valid" as const, text: "Skor akan direset. Simpan untuk mengosongkan hasil pertandingan." }
+    : scoreEditorMessage(match.stage, scores, teamALabel, teamBLabel);
 
   function updateScore(setIndex: number, side: "a" | "b", value: string) {
     setDraft((current) => current.map((score, index) => (index === setIndex ? { ...score, [side]: value } : score)));
   }
 
+  function resetScores() {
+    setDraft(zeroDraft());
+    firstInputRef.current?.focus();
+  }
+
   function submit() {
+    if (resetRequested) {
+      dispatch({ type: "RESET_MATCH_SCORES", matchId: match.id });
+      onClose();
+      return;
+    }
     if (!outcome) return;
     dispatch({ type: "RECORD_SCORES", matchId: match.id, setScores: scores });
     onClose();
@@ -153,8 +174,11 @@ function ScoreEditorPanel({ match, teamALabel, teamBLabel, onClose }: ScoreEdito
         {message.text}
       </p>
       <div className="score-editor-actions">
-        <Button variant="primary" disabled={!outcome} onClick={submit}>
+        <Button variant="primary" disabled={!outcome && !resetRequested} onClick={submit}>
           Simpan skor
+        </Button>
+        <Button variant="secondary" icon={<RotateCcw size={16} />} onClick={resetScores}>
+          Reset 0–0
         </Button>
         <Button variant="secondary" onClick={onClose}>
           Batal

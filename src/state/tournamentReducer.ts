@@ -12,6 +12,7 @@ export type TournamentAction =
   | { type: "SET_MATCH_OPERATIONS"; matchId: string; court: string; scheduledAt: string; status: Exclude<MatchOperationalStatus, "completed"> }
   | { type: "RECORD_RESULT"; matchId: string; result: SetResult; winnerTeamId: string | null }
   | { type: "RECORD_SCORES"; matchId: string; setScores: MatchSetScores }
+  | { type: "RESET_MATCH_SCORES"; matchId: string }
   | { type: "IMPORT_TOURNAMENT"; state: TournamentState }
   | { type: "RESET_TOURNAMENT" };
 
@@ -309,6 +310,60 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
         }
       }
       resolveThirdPlaceBye(matches);
+      return { ...state, matches };
+    }
+
+    case "RESET_MATCH_SCORES": {
+      const match = state.matches.find((item) => item.id === action.matchId);
+      if (!match || !match.teamAId || !match.teamBId) return state;
+
+      if (match.stage === "group") {
+        const matches = state.matches.map((item) => {
+          if (item.id === match.id) {
+            return { ...item, result: null, winnerTeamId: null, setScores: null, isBye: false, operationalStatus: "scheduled" as const };
+          }
+          if (item.stage !== "group") {
+            return {
+              ...item,
+              teamAId: null,
+              teamBId: null,
+              result: null,
+              winnerTeamId: null,
+              setScores: null,
+              isBye: false,
+              operationalStatus: "scheduled" as const,
+            };
+          }
+          return { ...item };
+        });
+        return { ...state, manualGroupRankings: [], matches, byes: [] };
+      }
+
+      const matches = state.matches.map((item) => ({ ...item }));
+      const matchToReset = matches.find((item) => item.id === action.matchId);
+      if (!matchToReset) return state;
+
+      function clearMatchAndDescendants(source: Match): void {
+        source.result = null;
+        source.winnerTeamId = null;
+        source.setScores = null;
+        source.isBye = false;
+        source.operationalStatus = "scheduled";
+
+        for (const [targetId, targetSlot] of [
+          [source.nextMatchId, source.nextMatchSlot],
+          [source.loserNextMatchId, source.loserNextMatchSlot],
+        ] as const) {
+          if (!targetId || !targetSlot) continue;
+          const target = matches.find((item) => item.id === targetId);
+          if (!target) continue;
+          if (targetSlot === "A") target.teamAId = null;
+          else target.teamBId = null;
+          clearMatchAndDescendants(target);
+        }
+      }
+
+      clearMatchAndDescendants(matchToReset);
       return { ...state, matches };
     }
 

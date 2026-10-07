@@ -115,6 +115,38 @@ describe("tournamentReducer group qualification", () => {
     expect([semifinal2.teamAId, semifinal2.teamBId]).toEqual(["t5", "t1"]);
   });
 
+  it("saves a 0-0 score reset by returning a group match to an unplayed state", () => {
+    let state = makeState();
+    state = tournamentReducer(state, { type: "RECORD_RESULT", matchId: "group-A-1-2", result: "2-0", winnerTeamId: "t1" });
+
+    state = tournamentReducer(state, { type: "RESET_MATCH_SCORES", matchId: "group-A-1-2" });
+    const resetMatch = state.matches.find((match) => match.id === "group-A-1-2")!;
+
+    expect(resetMatch.result).toBeNull();
+    expect(resetMatch.winnerTeamId).toBeNull();
+    expect(resetMatch.setScores).toBeNull();
+    expect(resetMatch.operationalStatus).toBe("scheduled");
+  });
+
+  it("clears the knockout bracket when a completed group match is reset", () => {
+    let state = makeState();
+    const results = [
+      ["group-A-1-2", "t1"], ["group-A-1-3", "t1"], ["group-A-1-4", "t1"],
+      ["group-A-2-3", "t2"], ["group-A-2-4", "t2"], ["group-A-3-4", "t3"],
+      ["group-B-1-2", "t5"], ["group-B-1-3", "t5"], ["group-B-2-3", "t6"],
+    ] as const;
+    for (const [matchId, winnerTeamId] of results) {
+      state = tournamentReducer(state, { type: "RECORD_RESULT", matchId, result: "2-0", winnerTeamId });
+    }
+    expect(state.matches.find((match) => match.id === "semifinal-1")!.teamAId).toBe("t1");
+
+    state = tournamentReducer(state, { type: "RESET_MATCH_SCORES", matchId: "group-A-1-2" });
+
+    expect(state.matches.filter((match) => match.stage !== "group").every((match) => (
+      match.teamAId === null && match.teamBId === null && match.result === null && match.winnerTeamId === null
+    ))).toBe(true);
+  });
+
   it("migrateState backfills a third-place match onto a pre-existing tournament that predates the feature", () => {
     // Simulates data saved before the third-place playoff existed: semifinals
     // and final already decided, but no loserNextMatchId wiring and no

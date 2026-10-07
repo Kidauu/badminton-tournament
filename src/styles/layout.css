@@ -552,6 +552,10 @@
   border-bottom: none;
 }
 
+.bracket-card-row-winner {
+  background: var(--court-tint);
+}
+
 .bracket-card-seed {
   flex: 0 0 auto;
   font-family: var(--font-mono);
@@ -583,6 +587,16 @@
 .bracket-card-name-loser {
   font-weight: 500;
   color: var(--ink-2);
+}
+
+.bracket-card-name-pending {
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.bracket-card-team-label {
+  font-size: 12px;
+  color: var(--ink-3);
 }
 
 .bracket-card-sets {
@@ -1270,144 +1284,255 @@
   background: rgba(255, 255, 255, 0.16);
 }
 
+/* ====================== Knockout bracket ====================== */
+
 .bracket-scroll {
-  overflow-x: auto;
-  padding-bottom: 4px;
   margin-bottom: var(--sp-8);
 }
 
-.bracket-grid {
-  display: grid;
-  grid-template-columns: minmax(300px, 1fr) 56px minmax(300px, 1fr) 56px minmax(220px, 0.75fr);
-  min-width: 960px;
-  align-items: center;
-  gap: 0;
-}
-
-.bracket-col-semis {
+.bracket {
+  --card-h: 150px;
+  --join-w: 56px;
+  --join-gap: 30px;
+  --join-line: 2px solid var(--line-strong);
+  --join-line-active: 2px solid var(--court);
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: var(--sp-5);
 }
 
-.bracket-connector-1 {
+.bracket-heads,
+.bracket-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--join-w) minmax(0, 1fr) var(--join-w) minmax(0, 0.8fr);
+}
+
+.bracket-heads span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.bracket-col {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: center;
-  height: 100%;
+  gap: var(--join-gap);
+  min-width: 0;
+}
+
+/* Penghubung: dua lengan ("]") dari kartu sumber, lalu satu garis ke kartu tujuan. */
+.bracket-join {
   position: relative;
 }
 
-.bracket-connector-1-top,
-.bracket-connector-1-bottom {
-  width: 28px;
-  height: 90px;
-  border-right: 2px solid var(--line-strong);
-  box-sizing: border-box;
+.bracket-join-arm {
+  position: absolute;
+  left: 0;
+  right: 50%;
+  height: calc(var(--card-h) / 2 + var(--join-gap) / 2);
+  border-right: var(--join-line);
 }
 
-.bracket-connector-1-top {
-  border-top: 2px solid var(--line-strong);
+.bracket-join-arm-top {
+  top: calc(var(--card-h) / 2);
+  border-top: var(--join-line);
   border-top-right-radius: 10px;
-  align-self: flex-end;
 }
 
-.bracket-connector-1-bottom {
-  border-bottom: 2px solid var(--line-strong);
+.bracket-join-arm-bottom {
+  bottom: calc(var(--card-h) / 2);
+  border-bottom: var(--join-line);
   border-bottom-right-radius: 10px;
-  align-self: flex-start;
 }
 
-.bracket-connector-1-line {
-  width: 28px;
-  height: 2px;
-  background: var(--line-strong);
+.bracket-join-stub {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  right: 0;
+  height: 0;
+  border-top: var(--join-line);
 }
 
-.bracket-connector-1-active .bracket-connector-1-top,
-.bracket-connector-1-active .bracket-connector-1-bottom,
-.bracket-connector-1-active .bracket-connector-1-line {
-  border-color: var(--court);
-  background: var(--court);
+.bracket-join-link .bracket-join-stub {
+  left: 0;
 }
 
-.bracket-connector-2 {
-  height: 2px;
-  width: 56px;
-  background: var(--line-strong);
+.bracket-join .is-active.bracket-join-arm-top {
+  border-top: var(--join-line-active);
+  border-right-color: var(--court);
 }
 
-.bracket-connector-2-active {
-  background: var(--court);
+.bracket-join .is-active.bracket-join-arm-bottom {
+  border-bottom: var(--join-line-active);
+  border-right-color: var(--court);
 }
 
-.champion-slot {
-  height: 150px;
+.bracket-join .bracket-join-stub.is-active {
+  border-top: var(--join-line-active);
+}
+
+.bracket-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.bracket-divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+
+.bracket-col-sources {
+  gap: 10px;
+}
+
+.bracket-source {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px dashed var(--line-strong);
   border-radius: var(--r-row);
-  background: var(--court);
-  color: #ffffff;
+  background: var(--fill-2);
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Baris juara 3: dua kartu sumber setinggi 52px (jarak 10px), pusatnya ±31px dari tengah baris. */
+.bracket-row-third .bracket-join-arm {
+  height: 31px;
+}
+
+.bracket-row-third .bracket-join-arm-top {
+  top: calc(50% - 31px);
+}
+
+.bracket-row-third .bracket-join-arm-bottom {
+  bottom: calc(50% - 31px);
+}
+
+.bracket-slot {
+  height: var(--card-h);
+  border-radius: var(--r-row);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  text-align: center;
   padding: 0 16px;
+  text-align: center;
 }
 
-.champion-slot-label {
+.bracket-slot-champion {
+  background: var(--court);
+  color: #ffffff;
+}
+
+.bracket-slot-bronze {
+  background: var(--medal-bronze);
+  color: #ffffff;
+}
+
+.bracket-slot-empty {
+  border: 2px dashed var(--line-strong);
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.bracket-slot-label {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--court-on-dark);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.champion-slot-name {
-  font-size: 22px;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--court-on-dark);
 }
 
-.champion-slot-sub {
+.bracket-slot-bronze .bracket-slot-label,
+.bracket-slot-bronze .bracket-slot-sub {
+  color: #fff3eb;
+}
+
+.bracket-slot-name {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.bracket-slot-sub {
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--court-on-dark);
 }
 
-.champion-slot-empty {
-  height: 150px;
-  border-radius: var(--r-row);
-  border: 2px dashed var(--line-strong);
-  color: var(--ink-3);
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/* Layar sempit: bagan ditumpuk vertikal, tanpa garis penghubung. */
+@media (max-width: 900px) {
+  .bracket-heads,
+  .bracket-join {
+    display: none;
+  }
 
-.third-place-wrap {
-  margin-top: var(--sp-6);
-  max-width: 400px;
-}
+  .bracket-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
 
-.third-place-label {
-  margin-bottom: 10px;
-}
+  .bracket-col {
+    gap: var(--sp-3);
+  }
 
-.bracket-col-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink-2);
-  margin-bottom: 14px;
+  .bracket-col-sources {
+    flex-direction: row;
+  }
+
+  .bracket-source {
+    flex: 1 1 0;
+  }
+
+  .bracket-slot {
+    height: 96px;
+  }
 }
 
 .group-table-section {
   margin-top: 40px;
   margin-bottom: var(--sp-6);
+}
+
+.schedule-week-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.schedule-week-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.schedule-week-toolbar .segmented {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .group-table-wrap {
@@ -1445,6 +1570,12 @@
   letter-spacing: 0.04em;
 }
 
+.match-table-empty {
+  padding: 32px 14px !important;
+  text-align: center;
+  color: var(--ink-3);
+}
+
 .match-table-no {
   font-family: var(--font-mono);
   color: var(--ink-3);
@@ -1462,6 +1593,20 @@
   align-items: center;
   gap: 6px;
   font-size: 14px;
+}
+
+.match-table-team-info {
+  min-width: 0;
+}
+
+.match-table-team-members {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .match-table-result-main {

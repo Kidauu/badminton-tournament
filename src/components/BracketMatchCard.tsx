@@ -20,13 +20,13 @@ interface BracketMatchCardProps {
 
 function BracketCardRow({ side, isWinner, placeholder }: { side: BracketSide | null; isWinner: boolean; placeholder: string }) {
   return (
-    <div className="bracket-card-row">
+    <div className={`bracket-card-row ${isWinner ? "bracket-card-row-winner" : ""}`}>
       {side?.seed && <span className="bracket-card-seed">{side.seed}</span>}
       <div className="bracket-card-team">
-        <span className={`bracket-card-name ${isWinner ? "bracket-card-name-winner" : "bracket-card-name-loser"}`}>
-          {side ? side.name : placeholder}
+        <span className={`bracket-card-name ${!side ? "bracket-card-name-pending" : isWinner ? "bracket-card-name-winner" : "bracket-card-name-loser"}`}>
+          {side?.members ?? (side ? side.name : placeholder)}
         </span>
-        {side?.members && <span className="score-line-members">{side.members}</span>}
+        {side?.members && <span className="bracket-card-team-label">{side.name}</span>}
       </div>
       {side && (
         <div className="bracket-card-sets">

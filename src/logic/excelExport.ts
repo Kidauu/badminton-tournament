@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { scoreLabel } from "./scoring";
 import { computeStandings, teamsInGroup } from "./standings";
 import { teamPlayerNames } from "./format";

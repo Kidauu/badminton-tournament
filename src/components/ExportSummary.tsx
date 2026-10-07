@@ -1,4 +1,4 @@
-import { Download, Printer } from "lucide-react";
+import { Download, FileSpreadsheet, Printer } from "lucide-react";
 import { computeStandings, teamsInGroup } from "../logic/standings";
 import { scoreLabel } from "../logic/scoring";
 import { Button } from "./Button";
@@ -53,6 +53,10 @@ export function ExportSummary() {
     download("rekap-turnamen-badminton.csv", `﻿${rows.map((row) => row.map(csvCell).join(",")).join("\n")}`, "text/csv;charset=utf-8");
   }
 
+  function exportExcel() {
+    void import("../logic/excelExport").then(({ downloadTournamentExcel }) => downloadTournamentExcel(state));
+  }
+
   return (
     <>
       <Button variant="secondary" icon={<Printer size={16} />} onClick={() => window.print()}>
@@ -60,6 +64,9 @@ export function ExportSummary() {
       </Button>
       <Button variant="primary" icon={<Download size={16} />} onClick={exportCsv}>
         Unduh rekap CSV
+      </Button>
+      <Button variant="secondary" icon={<FileSpreadsheet size={16} />} onClick={exportExcel}>
+        Unduh Excel
       </Button>
     </>
   );

@@ -1,39 +1,74 @@
-import { Fragment } from "react";
-import { Printer, Trophy, ArrowRight } from "lucide-react";
+import { Fragment, useState } from "react";
+import { Printer, ArrowRight } from "lucide-react";
 import { scoreLabel } from "../logic/scoring";
 import { teamPlayerNames } from "../logic/format";
 import { MatchOperations, MatchStatusCell } from "../components/MatchOperations";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
-import { BracketMatchCard } from "../components/BracketMatchCard";
-import { cellsFromMatch } from "../components/ScoreLine";
+import { KnockoutBracket } from "../components/KnockoutBracket";
+import { SegmentedControl } from "../components/SegmentedControl";
 import { useTournament } from "../state/TournamentContext";
 import type { TabId } from "../types/nav";
-import type { Match, Team } from "../types/tournament";
+import type { Match, Participant, Team } from "../types/tournament";
+
+type ScheduleFilter = "all" | "unscheduled" | `week-${string}`;
+
+interface ScheduleWeek {
+  value: ScheduleFilter;
+  label: string;
+  count: number;
+}
 
 function teamLabel(teamId: string | null, teamsById: Map<string, Team>, fallback: string): string {
   return teamId ? `Tim ${teamsById.get(teamId)?.seq ?? "?"}` : fallback;
-}
-
-function buildSide(
-  teamId: string | null,
-  teamsById: Map<string, Team>,
-  participants: { id: string; name: string }[],
-  match: Match,
-  side: "A" | "B",
-  seed?: string,
-) {
-  if (!teamId) return null;
-  const team = teamsById.get(teamId);
-  if (!team) return null;
-  const [a, b] = teamPlayerNames(team, participants);
-  return { seed, name: `Tim ${team.seq}`, members: `${a} & ${b}`, cells: cellsFromMatch(match, side, 3) };
 }
 
 function formatScheduleTime(value?: string): string {
   if (!value) return "Waktu belum diatur";
   const date = new Date(value);
   return Number.isNaN(date.valueOf()) ? "Waktu belum diatur" : new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
+function scheduledDate(value?: string): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? null : date;
+}
+
+function weekStart(date: Date): Date {
+  const start = new Date(date);
+  const mondayOffset = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - mondayOffset);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function dateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function scheduleWeekKey(match: Match): ScheduleFilter | null {
+  const date = scheduledDate(match.scheduledAt);
+  return date ? `week-${dateKey(weekStart(date))}` : null;
+}
+
+function weekLabel(key: ScheduleFilter): string {
+  const start = new Date(`${key.replace("week-", "")}T00:00:00`);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const formatter = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return `${formatter.format(start)} – ${formatter.format(end)}`;
+}
+
+function scheduleWeeks(matches: Match[]): ScheduleWeek[] {
+  const counts = new Map<ScheduleFilter, number>();
+  for (const match of matches) {
+    const key = scheduleWeekKey(match);
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, count], index) => ({ value: key, label: `Minggu ${index + 1} · ${weekLabel(key)}`, count }));
 }
 
 function nextMatch(matches: Match[]): Match | undefined {
@@ -66,7 +101,13 @@ function MatchResultCell({ match, teamsById }: { match: Match; teamsById: Map<st
   );
 }
 
-function GroupMatchRow({ match, teamsById, code }: { match: Match; teamsById: Map<string, Team>; code: string }) {
+function teamMembers(teamId: string | null, teamsById: Map<string, Team>, participants: Participant[]): string | null {
+  if (!teamId) return null;
+  const team = teamsById.get(teamId);
+  return team ? teamPlayerNames(team, participants).join(" & ") : null;
+}
+
+function GroupMatchRow({ match, teamsById, participants, code }: { match: Match; teamsById: Map<string, Team>; participants: Participant[]; code: string }) {
   const isDraw = match.result === "1-1";
   const nameClass = (side: "A" | "B") => {
     if (!match.result) return "";
@@ -80,8 +121,15 @@ function GroupMatchRow({ match, teamsById, code }: { match: Match; teamsById: Ma
       <td className="match-table-no">{code}</td>
       <td>
         <div className="match-table-teams">
-          <span className={`match-table-team ${nameClass("A")}`}>{teamLabel(match.teamAId, teamsById, "-")}</span>
-          <span className={`match-table-team ${nameClass("B")}`}>{teamLabel(match.teamBId, teamsById, "-")}</span>
+          {(["A", "B"] as const).map((side) => {
+            const teamId = side === "A" ? match.teamAId : match.teamBId;
+            return (
+              <div key={side} className="match-table-team-info">
+                <span className={`match-table-team ${nameClass(side)}`}>{teamLabel(teamId, teamsById, "-")}</span>
+                {teamMembers(teamId, teamsById, participants) && <span className="match-table-team-members">{teamMembers(teamId, teamsById, participants)}</span>}
+              </div>
+            );
+          })}
         </div>
       </td>
       <td>
@@ -100,7 +148,20 @@ function GroupMatchRow({ match, teamsById, code }: { match: Match; teamsById: Ma
 export function ScheduleScreen({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
   const { state } = useTournament();
   const teamsById = new Map(state.teams.map((team) => [team.id, team]));
-  const groupMatches = (groupId: "A" | "B") => state.matches.filter((match) => match.stage === "group" && match.groupId === groupId);
+  const allGroupMatches = state.matches.filter((match) => match.stage === "group");
+  const [scheduleFilter, setScheduleFilter] = useState<ScheduleFilter>("all");
+  const weeks = scheduleWeeks(allGroupMatches);
+  const unscheduledCount = allGroupMatches.filter((match) => !scheduleWeekKey(match)).length;
+  const scheduleOptions = [
+    { value: "all" as const, label: "Semua", count: allGroupMatches.length },
+    ...weeks,
+    ...(unscheduledCount > 0 ? [{ value: "unscheduled" as const, label: "Belum dijadwalkan", count: unscheduledCount }] : []),
+  ];
+  const activeScheduleFilter = scheduleOptions.some((option) => option.value === scheduleFilter) ? scheduleFilter : "all";
+  const groupMatches = (groupId: "A" | "B") => allGroupMatches.filter((match) => (
+    match.groupId === groupId && (activeScheduleFilter === "all" || (activeScheduleFilter === "unscheduled" ? !scheduleWeekKey(match) : scheduleWeekKey(match) === activeScheduleFilter))
+  ));
+  const visibleGroupCount = groupMatches("A").length + groupMatches("B").length;
   const semifinal1 = state.matches.find((match) => match.id === "semifinal-1");
   const semifinal2 = state.matches.find((match) => match.id === "semifinal-2");
   const final = state.matches.find((match) => match.id === "final");
@@ -110,13 +171,6 @@ export function ScheduleScreen({ onNavigate }: { onNavigate: (tab: TabId) => voi
   const allMatchesCount = state.matches.filter((m) => !(m.stage === "third_place" && !m.teamAId && !m.teamBId)).length;
   const doneCount = state.matches.filter((m) => m.result !== null).length;
   const everythingDone = allMatchesCount > 0 && doneCount === allMatchesCount;
-
-  const sf1Done = Boolean(semifinal1?.result);
-  const sf2Done = Boolean(semifinal2?.result);
-  const championDone = Boolean(final?.winnerTeamId);
-
-  const championTeam = final?.winnerTeamId ? teamsById.get(final.winnerTeamId) : undefined;
-  const championNames = championTeam ? teamPlayerNames(championTeam, state.participants) : null;
 
   return (
     <section>
@@ -161,82 +215,25 @@ export function ScheduleScreen({ onNavigate }: { onNavigate: (tab: TabId) => voi
         )}
       </div>
 
-      {semifinal1 && semifinal2 && final && (
-        <div className="bracket-scroll">
-          <div className="bracket-grid">
-            <div className="bracket-col-semis">
-              <BracketMatchCard
-                roundLabel="Semifinal 1"
-                done={sf1Done}
-                sideA={buildSide(semifinal1.teamAId, teamsById, state.participants, semifinal1, "A", "A1")}
-                sideB={buildSide(semifinal1.teamBId, teamsById, state.participants, semifinal1, "B", "B2")}
-                winnerSide={semifinal1.winnerTeamId ? (semifinal1.winnerTeamId === semifinal1.teamAId ? "A" : "B") : null}
-                placeholderA="Juara Grup A"
-                placeholderB="Runner-up Grup B"
-              />
-              <BracketMatchCard
-                roundLabel="Semifinal 2"
-                done={sf2Done}
-                sideA={buildSide(semifinal2.teamAId, teamsById, state.participants, semifinal2, "A", "B1")}
-                sideB={buildSide(semifinal2.teamBId, teamsById, state.participants, semifinal2, "B", "A2")}
-                winnerSide={semifinal2.winnerTeamId ? (semifinal2.winnerTeamId === semifinal2.teamAId ? "A" : "B") : null}
-                placeholderA="Juara Grup B"
-                placeholderB="Runner-up Grup A"
-              />
-            </div>
-
-            <div className="bracket-connector-1" aria-hidden="true">
-              <div className={`bracket-connector-1-top ${sf1Done ? "bracket-connector-1-active" : ""}`} />
-              <div className={`bracket-connector-1-bottom ${sf2Done ? "bracket-connector-1-active" : ""}`} />
-              <div className={`bracket-connector-1-line ${sf1Done && sf2Done ? "bracket-connector-1-active" : ""}`} />
-            </div>
-
-            <BracketMatchCard
-              roundLabel="Final"
-              done={championDone}
-              sideA={buildSide(final.teamAId, teamsById, state.participants, final, "A")}
-              sideB={buildSide(final.teamBId, teamsById, state.participants, final, "B")}
-              winnerSide={final.winnerTeamId ? (final.winnerTeamId === final.teamAId ? "A" : "B") : null}
-              placeholderA="Pemenang Semifinal 1"
-              placeholderB="Pemenang Semifinal 2"
-            />
-
-            <div className={`bracket-connector-2 ${championDone ? "bracket-connector-2-active" : ""}`} aria-hidden="true" />
-
-            {championTeam && championNames ? (
-              <div className="champion-slot">
-                <span className="champion-slot-label">
-                  <Trophy size={14} />
-                  Juara
-                </span>
-                <p className="champion-slot-name">
-                  {championNames[0]} &amp; {championNames[1]}
-                </p>
-                <p className="champion-slot-sub mono-num">Tim {championTeam.seq}</p>
-              </div>
-            ) : (
-              <div className="champion-slot-empty">Menunggu final</div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {thirdPlace && (thirdPlace.teamAId || thirdPlace.teamBId) && (
-        <div className="third-place-wrap">
-          <p className="bracket-col-label third-place-label">Perebutan Juara 3</p>
-          <BracketMatchCard
-            roundLabel="Perebutan Juara 3"
-            done={Boolean(thirdPlace.result)}
-            sideA={buildSide(thirdPlace.teamAId, teamsById, state.participants, thirdPlace, "A")}
-            sideB={buildSide(thirdPlace.teamBId, teamsById, state.participants, thirdPlace, "B")}
-            winnerSide={thirdPlace.winnerTeamId ? (thirdPlace.winnerTeamId === thirdPlace.teamAId ? "A" : "B") : null}
-            placeholderA="Kalah Semifinal 1"
-            placeholderB="Kalah Semifinal 2"
-          />
-        </div>
+      {semifinal1 && semifinal2 && final && thirdPlace && (
+        <KnockoutBracket
+          semifinal1={semifinal1}
+          semifinal2={semifinal2}
+          final={final}
+          thirdPlace={thirdPlace}
+          teamsById={teamsById}
+          participants={state.participants}
+        />
       )}
 
       <div className="group-table-section">
+        <div className="schedule-week-toolbar">
+          <div>
+            <h2 className="text-h2">Jadwal Pertandingan</h2>
+            <p className="schedule-week-desc">Pilih minggu untuk melihat dan mengatur jadwal pertandingan fase grup.</p>
+          </div>
+          <SegmentedControl value={activeScheduleFilter} onChange={setScheduleFilter} options={scheduleOptions} />
+        </div>
         <div className="card group-table-wrap">
           <table className="match-table">
             <thead>
@@ -249,16 +246,30 @@ export function ScheduleScreen({ onNavigate }: { onNavigate: (tab: TabId) => voi
               </tr>
             </thead>
             <tbody>
-              {(["A", "B"] as const).map((groupId) => (
-                <Fragment key={groupId}>
-                  <tr className="match-table-group-row">
-                    <td colSpan={6}>Fase Grup {groupId}</td>
-                  </tr>
-                  {groupMatches(groupId).map((match, i) => (
-                    <GroupMatchRow key={match.id} match={match} teamsById={teamsById} code={`${groupId}${i + 1}`} />
-                  ))}
-                </Fragment>
-              ))}
+              {visibleGroupCount > 0 ? (["A", "B"] as const).map((groupId) => {
+                const matches = groupMatches(groupId);
+                if (matches.length === 0) return null;
+                return (
+                  <Fragment key={groupId}>
+                    <tr className="match-table-group-row">
+                      <td colSpan={6}>Fase Grup {groupId}</td>
+                    </tr>
+                    {matches.map((match) => (
+                      <GroupMatchRow
+                        key={match.id}
+                        match={match}
+                        teamsById={teamsById}
+                        participants={state.participants}
+                        code={`${groupId}${allGroupMatches.filter((item) => item.groupId === groupId).indexOf(match) + 1}`}
+                      />
+                    ))}
+                  </Fragment>
+                );
+              }) : (
+                <tr>
+                  <td colSpan={6} className="match-table-empty">Tidak ada pertandingan pada pilihan minggu ini.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

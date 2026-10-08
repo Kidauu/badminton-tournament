@@ -1,4 +1,4 @@
-import { createStateHandler } from "../server/stateHandler.ts";
+import { createStateHandler } from "../server/stateHandler.js";
 
 const handler = createStateHandler({
   redisUrl: process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL,

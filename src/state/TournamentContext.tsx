@@ -3,9 +3,10 @@ import type { Dispatch, ReactNode } from "react";
 import type { TournamentState } from "../types/tournament";
 import { createInitialState, migrateState, tournamentReducer } from "./tournamentReducer";
 import type { TournamentAction } from "./tournamentReducer";
-import { loadTournamentState, saveTournamentState } from "./persistence";
+import { loadSyncMeta, loadTournamentState, saveSyncMeta, saveTournamentState } from "./persistence";
 import { fetchRemote, loadAdminAuth, makeBasicAuth, pushRemote, saveAdminAuth } from "./remoteSync";
 import { RETRY_MS, nextPollDelay } from "./pollSchedule";
+import { CONFLICT_MESSAGE, decideConflict, decidePull } from "./syncDecision";
 
 /** admin: boleh ubah & tersinkron · viewer: hanya lihat · local: tanpa server (dev) */
 export type TournamentRole = "admin" | "viewer" | "local";
@@ -15,6 +16,19 @@ export type LoginResult = "ok" | "invalid" | "blocked" | "error";
 const PUSH_DEBOUNCE_MS = 500;
 
 type PullOutcome = "changed" | "unchanged" | "failed";
+
+/** Dialog konfirmasi sering diblokir di tab latar belakang (dianggap "Batal"), jadi tunggu sampai tab terlihat. */
+function whenVisible(): Promise<void> {
+  if (document.visibilityState === "visible") return Promise.resolve();
+  return new Promise((resolve) => {
+    const onChange = () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", onChange);
+      resolve();
+    };
+    document.addEventListener("visibilitychange", onChange);
+  });
+}
 
 interface TournamentContextValue {
   state: TournamentState;
@@ -47,8 +61,10 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
 
   const authRef = useRef<string | null>(loadAdminAuth());
   const pulledRef = useRef(false);
-  const remoteVersionRef = useRef<string | null>(null);
-  const syncedJsonRef = useRef<string | null>(null);
+  // Catatan sinkronisasi admin bertahan setelah reload, sehingga perubahan yang belum terkirim tidak ditimpa data server.
+  const [initialMeta] = useState(() => (loadAdminAuth() ? loadSyncMeta() : null));
+  const remoteVersionRef = useRef<string | null>(initialMeta?.baseVersion ?? null);
+  const syncedJsonRef = useRef<string | null>(initialMeta?.syncedJson ?? null);
   const stateRef = useRef(state);
 
   useEffect(() => {
@@ -56,12 +72,19 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     saveTournamentState(state);
   }, [state]);
 
+  /** Catat bahwa data lokal identik dengan server pada versi tertentu (admin: juga disimpan di HP). */
+  const rememberSync = useCallback((version: string | null, json: string) => {
+    remoteVersionRef.current = version;
+    syncedJsonRef.current = json;
+    saveSyncMeta(authRef.current ? { baseVersion: version, syncedJson: json } : null);
+  }, []);
+
   const adopt = useCallback((data: TournamentState, updatedAt: string | null) => {
     const migrated = migrateState(data);
-    remoteVersionRef.current = updatedAt;
-    syncedJsonRef.current = JSON.stringify(migrated);
-    if (syncedJsonRef.current !== JSON.stringify(stateRef.current)) rawDispatch({ type: "IMPORT_TOURNAMENT", state: migrated });
-  }, []);
+    const json = JSON.stringify(migrated);
+    rememberSync(updatedAt, json);
+    if (json !== JSON.stringify(stateRef.current)) rawDispatch({ type: "IMPORT_TOURNAMENT", state: migrated });
+  }, [rememberSync]);
 
   const pull = useCallback(async (): Promise<PullOutcome> => {
     const result = await fetchRemote(authRef.current);
@@ -77,24 +100,48 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     if (authRef.current && !result.isAdmin) {
       authRef.current = null;
       saveAdminAuth(null);
+      saveSyncMeta(null);
     }
     setRole(authRef.current ? "admin" : "viewer");
     let outcome: PullOutcome = "unchanged";
     if (result.data) {
-      if (!pulledRef.current || result.updatedAt !== remoteVersionRef.current) {
+      const localJson = JSON.stringify(stateRef.current);
+      const decision = decidePull({
+        alreadyPulled: pulledRef.current,
+        localJson,
+        // Penonton tidak punya perubahan lokal: hanya admin yang boleh dianggap "belum terkirim".
+        syncedJson: authRef.current ? syncedJsonRef.current : null,
+        baseVersion: remoteVersionRef.current,
+        serverJson: JSON.stringify(migrateState(result.data)),
+        serverVersion: result.updatedAt,
+      });
+      if (decision === "adopt") {
         adopt(result.data, result.updatedAt);
         outcome = "changed";
+      } else if (decision === "mark-synced") {
+        rememberSync(result.updatedAt, localJson);
+      } else if (decision === "ask") {
+        await whenVisible();
+        if (window.confirm(CONFLICT_MESSAGE)) {
+          // Timpa server: data lokal tetap, dikirim dengan versi server terbaru sebagai dasar.
+          remoteVersionRef.current = result.updatedAt;
+        } else {
+          adopt(result.data, result.updatedAt);
+          outcome = "changed";
+        }
       }
+      // "keep-local": server belum berubah, perubahan lokal dikirim oleh efek pengiriman di bawah.
     } else {
       // Server masih kosong: data lokal admin menjadi data awal bersama.
       remoteVersionRef.current = null;
       syncedJsonRef.current = null;
+      saveSyncMeta(null);
     }
     pulledRef.current = true;
     setSyncStatus("synced");
     setReady(true);
     return outcome;
-  }, [adopt]);
+  }, [adopt, rememberSync]);
 
   // Tarik data saat dibuka (ulangi sampai berhasil), lalu polling untuk penonton.
   // Hemat kuota: berhenti saat tab tersembunyi, melambat saat data tidak berubah,
@@ -163,17 +210,30 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       if (!auth) return;
       const result = await pushRemote(auth, state, remoteVersionRef.current);
       if (result.kind === "ok") {
-        remoteVersionRef.current = result.updatedAt;
-        syncedJsonRef.current = json;
+        rememberSync(result.updatedAt, json);
         setSyncStatus(JSON.stringify(stateRef.current) === json ? "synced" : "saving");
         // ada perubahan baru selama request berjalan: picu efek ini lagi
         setRetryTick((tick) => tick + 1);
       } else if (result.kind === "conflict") {
-        adopt(result.data, result.updatedAt);
-        setSyncStatus("synced");
+        if (decideConflict(json, JSON.stringify(migrateState(result.data))) === "mark-synced") {
+          rememberSync(result.updatedAt, json);
+          setSyncStatus(JSON.stringify(stateRef.current) === json ? "synced" : "saving");
+          setRetryTick((tick) => tick + 1);
+          return;
+        }
+        await whenVisible();
+        if (window.confirm(CONFLICT_MESSAGE)) {
+          // Timpa server: kirim ulang dengan versi server terbaru sebagai dasar.
+          remoteVersionRef.current = result.updatedAt;
+          setRetryTick((tick) => tick + 1);
+        } else {
+          adopt(result.data, result.updatedAt);
+          setSyncStatus("synced");
+        }
       } else if (result.kind === "unauthorized") {
         authRef.current = null;
         saveAdminAuth(null);
+        saveSyncMeta(null);
         setRole("viewer");
       } else {
         setSyncStatus("offline");
@@ -181,7 +241,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       }
     }, PUSH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [state, role, ready, retryTick, adopt]);
+  }, [state, role, ready, retryTick, adopt, rememberSync]);
 
   const dispatch = useCallback<Dispatch<TournamentAction>>(
     (action) => {
@@ -212,6 +272,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     authRef.current = null;
     saveAdminAuth(null);
+    saveSyncMeta(null);
     setRole("viewer");
   }, []);
 

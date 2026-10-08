@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { createStateHandler } from "../server/stateHandler.js";
 
 const handler = createStateHandler({

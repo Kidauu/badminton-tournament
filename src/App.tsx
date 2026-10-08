@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { TournamentProvider, useTournament } from "./state/TournamentContext";
 import { AppHeader } from "./components/AppHeader";
 import { SyncBanner } from "./components/SyncBanner";
+import { LoginDialog } from "./components/LoginDialog";
 import { ParticipantsScreen } from "./screens/ParticipantsScreen";
 import { SpinWheelScreen } from "./screens/SpinWheelScreen/SpinWheelScreen";
 import { TeamsScreen } from "./screens/TeamsScreen";
@@ -63,6 +64,7 @@ function AppShell() {
     <div className="app-shell">
       <AppHeader activeTab={activeTab} unlocked={unlocked} onSelectTab={setActiveTab} />
       <SyncBanner />
+      <LoginDialog />
       <main className="app-main">
         {activeTab === "peserta" && <ParticipantsScreen onNavigate={setActiveTab} />}
         {activeTab === "undian" && <SpinWheelScreen onNavigate={setActiveTab} />}

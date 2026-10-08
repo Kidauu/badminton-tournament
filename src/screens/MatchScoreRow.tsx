@@ -200,7 +200,7 @@ interface MatchScoreRowProps {
 }
 
 export function MatchScoreRow({ match, code, teamsById, isOpen, onOpen, onClose }: MatchScoreRowProps) {
-  const { state } = useTournament();
+  const { state, role } = useTournament();
   const teamA = match.teamAId ? teamsById.get(match.teamAId) : undefined;
   const teamB = match.teamBId ? teamsById.get(match.teamBId) : undefined;
   if (!teamA || !teamB) return null;
@@ -239,7 +239,7 @@ export function MatchScoreRow({ match, code, teamsById, isOpen, onOpen, onClose 
       </div>
       <div className="score-row-actions">
         <ResultChip text={chip.text} tone={chip.tone} rowFit />
-        {match.result ? (
+        {role === "viewer" ? null : match.result ? (
           <Button iconOnly variant="secondary" icon={<Pencil size={16} />} aria-label={`Ubah skor ${code}`} onClick={handleEditClick} />
         ) : (
           <Button variant="secondary" onClick={handleEditClick}>

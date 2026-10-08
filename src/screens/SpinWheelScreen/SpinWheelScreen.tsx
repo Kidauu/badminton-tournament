@@ -45,7 +45,7 @@ interface Reveal {
 }
 
 export function SpinWheelScreen({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
-  const { state, dispatch } = useTournament();
+  const { state, dispatch, role } = useTournament();
   const totalTeams = state.participants.length / 2;
   const remainingIds = state.pendingPairs.flat();
   const assigningGroups = state.pendingPairs.length === 0 && (state.pendingGroupSlots.length > 0 || state.groupAssignments.length > 0);
@@ -142,8 +142,8 @@ export function SpinWheelScreen({ onNavigate }: { onNavigate: (tab: TabId) => vo
                 <span className="wheel-pointer wheel-pointer-top" aria-hidden="true" />
                 {!assigningGroups && <span className="wheel-pointer wheel-pointer-bottom" aria-hidden="true" />}
                 <SpinWheel labels={labels} rotation={rotation} duration={duration} isSpinning={isSpinning} onTransitionEnd={handleTransitionEnd} />
-                <button type="button" className="wheel-hub" onClick={handleSpin} disabled={isSpinning}>
-                  {isSpinning ? "Memutar" : "Putar"}
+                <button type="button" className="wheel-hub" onClick={handleSpin} disabled={isSpinning || role === "viewer"}>
+                  {role === "viewer" ? "Admin" : isSpinning ? "Memutar" : "Putar"}
                 </button>
               </div>
 

@@ -21,8 +21,8 @@ function findConflict(match: Match, allMatches: Match[]): Match | undefined {
 
 /** Waktu + Lapangan inputs for one match row in the group schedule table. */
 export function MatchOperations({ match }: MatchOperationsProps) {
-  const { state, dispatch } = useTournament();
-  const locked = Boolean(match.result || match.isBye);
+  const { state, dispatch, role } = useTournament();
+  const locked = Boolean(match.result || match.isBye) || role === "viewer";
   const conflict = locked ? undefined : findConflict(match, state.matches);
 
   function update(next: Partial<{ court: string; scheduledAt: string; status: Exclude<MatchOperationalStatus, "completed"> }>) {
@@ -62,8 +62,16 @@ export function MatchOperations({ match }: MatchOperationsProps) {
 
 /** Computed status cell: an editable in-progress toggle while pending, a plain "Selesai" badge once done. */
 export function MatchStatusCell({ match }: { match: Match }) {
-  const { dispatch } = useTournament();
+  const { dispatch, role } = useTournament();
   const locked = Boolean(match.result || match.isBye);
+
+  if (!locked && role === "viewer") {
+    return (
+      <span className="match-table-status match-table-status-pending">
+        {match.operationalStatus === "in_progress" ? "Berlangsung" : "Belum main"}
+      </span>
+    );
+  }
 
   if (locked) {
     return (

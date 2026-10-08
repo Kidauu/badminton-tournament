@@ -52,19 +52,19 @@ See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rule
 ## Sinkronisasi cloud (akses dari HP)
 
 Data turnamen disimpan di Redis (Upstash) lewat Vercel Function `api/state.ts`.
-Semua orang bisa **melihat**; hanya pemegang PIN admin yang bisa **mengubah**.
+Semua orang bisa **melihat** tanpa login (mode baca-saja); hanya **admin** (username + password) yang bisa **mengubah**.
 
 Deploy ke Vercel:
 
 1. Import repo ke Vercel (preset Vite terdeteksi otomatis).
 2. Tab **Storage** → tambah **Upstash for Redis** (gratis) dan hubungkan ke project.
    Ini otomatis mengisi `KV_REST_API_URL` dan `KV_REST_API_TOKEN`.
-3. **Settings → Environment Variables**: tambah `ADMIN_PIN` (PIN rahasia lu).
+3. **Settings → Environment Variables**: tambah `ADMIN_USERNAME` dan `ADMIN_PASSWORD`. Jangan taruh password di kode atau di file yang di-commit.
 4. Redeploy.
 
 Pemakaian:
 
-- Admin: menu ⋯ → **Masuk admin** → masukkan PIN. Perubahan otomatis tersimpan ke server.
+- Admin: tombol **Masuk admin** di banner atau menu ⋯ → isi username + password. Perubahan otomatis tersimpan ke server. Login gagal 10 kali dari satu IP diblokir 15 menit.
 - Penonton: buka URL biasa; tampilan baca-saja, diperbarui tiap 10 detik.
 - Pertama kali masuk admin di perangkat yang sudah berisi data lokal, data itu menjadi data awal di server (kalau server masih kosong).
 - Dev lokal tanpa API tetap jalan seperti dulu (mode lokal, localStorage). Untuk mencoba API: `vercel dev`.

@@ -12,7 +12,7 @@ function RankBadge({ rank, qualified }: { rank: number; qualified: boolean }) {
 }
 
 export function StandingsScreen() {
-  const { state, dispatch } = useTournament();
+  const { state, dispatch, role } = useTournament();
   const teamsById = new Map(state.teams.map((team) => [team.id, team]));
   const groupMatches = state.matches.filter((match) => match.stage === "group");
 
@@ -89,7 +89,10 @@ export function StandingsScreen() {
                 </tbody>
               </table>
             </div>
-            {needsManualRanking && (
+            {needsManualRanking && role === "viewer" && !savedRanking && (
+              <p className="standings-legend">Peringkat imbang sedang menunggu keputusan admin.</p>
+            )}
+            {needsManualRanking && role !== "viewer" && (
               <ManualRanking
                 groupId={groupId}
                 rows={rows}

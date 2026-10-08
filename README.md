@@ -65,6 +65,6 @@ Deploy ke Vercel:
 Pemakaian:
 
 - Admin: tombol **Masuk admin** di banner atau menu ⋯ → isi username + password. Perubahan otomatis tersimpan ke server. Login gagal 10 kali dari satu IP diblokir 15 menit.
-- Penonton: buka URL biasa; tampilan baca-saja, diperbarui tiap 10 detik.
+- Penonton: buka URL biasa; tampilan baca-saja. Data ditarik tiap 10 detik, melambat jadi 30 detik kalau lama tidak berubah, dan berhenti saat tab tersembunyi. Bacaan publik (`/api/state?public=1`) di-cache CDN 5 detik, jadi jumlah penonton hampir tidak menambah pemakaian kuota gratis (Vercel Hobby + Upstash Free).
 - Data lokal tidak ikut pindah otomatis ke alamat Vercel (alamat beda = penyimpanan browser beda). Untuk memindahkan turnamen yang sudah berjalan: di alamat lama pakai menu ⋯ → **Backup data (.json)**, lalu di alamat Vercel masuk admin → ⋯ → **Restore dari backup**. Hasil undian dan skor ikut persis sama.
 - Dev lokal tanpa API tetap jalan seperti dulu (mode lokal, localStorage). Untuk mencoba API: `vercel dev`.

@@ -61,7 +61,8 @@ function MatchSection({
 }
 
 export function ScoreEntryScreen({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
-  const { state } = useTournament();
+  const { state, role } = useTournament();
+  const viewer = role === "viewer";
   const teamsById = new Map(state.teams.map((team) => [team.id, team]));
   const [filter, setFilter] = useState<Filter>("all");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -82,8 +83,12 @@ export function ScoreEntryScreen({ onNavigate }: { onNavigate: (tab: TabId) => v
   return (
     <section>
       <PageHeader
-        title="Input Skor"
-        description="Isi skor per set. Hasil, poin, dan klasemen langsung terhitung."
+        title={viewer ? "Skor Pertandingan" : "Input Skor"}
+        description={
+          viewer
+            ? "Hasil pertandingan terbaru, diperbarui otomatis. Poin dan klasemen langsung terhitung."
+            : "Isi skor per set. Hasil, poin, dan klasemen langsung terhitung."
+        }
         actions={
           <Button variant="secondary" icon={<ArrowRight size={16} />} onClick={() => onNavigate("klasemen")}>
             Lihat klasemen
@@ -119,7 +124,7 @@ export function ScoreEntryScreen({ onNavigate }: { onNavigate: (tab: TabId) => v
         />
         <div className="score-fill-status">
           <span className="score-fill-count mono-num">
-            {filledCount} / {allPlayable.length} terisi
+            {filledCount} / {allPlayable.length} {viewer ? "selesai" : "terisi"}
           </span>
           <div className="score-fill-track">
             <div className="score-fill-bar" style={{ width: `${fillPercent}%` }} />

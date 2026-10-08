@@ -3,6 +3,9 @@
 
 const STATE_KEY = "badminton-tournament:shared";
 const FAIL_KEY_PREFIX = "badminton-tournament:login-fail:";
+// Hanya bacaan publik (?public=1, tanpa Authorization) yang boleh di-cache CDN.
+// Jumlah penonton tidak lagi menambah beban ke fungsi dan Redis.
+const PUBLIC_CACHE_CONTROL = "public, max-age=0, s-maxage=5, stale-while-revalidate=10";
 const MAX_FAILED_LOGINS = 10;
 const FAIL_WINDOW_SECONDS = 15 * 60;
 
@@ -18,10 +21,10 @@ interface StoredDocument {
   updatedAt: string;
 }
 
-function json(body: unknown, status = 200): Response {
+function json(body: unknown, status = 200, cacheControl = "no-store"): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "no-store" },
+    headers: { "content-type": "application/json", "cache-control": cacheControl },
   });
 }
 
@@ -98,7 +101,12 @@ export function createStateHandler(config: StateHandlerConfig) {
 
       if (request.method === "GET") {
         const document = await readDocument();
-        return json({ data: document?.data ?? null, updatedAt: document?.updatedAt ?? null, isAdmin: auth === "ok" });
+        const cacheable = auth === "none" && new URL(request.url).searchParams.get("public") === "1";
+        return json(
+          { data: document?.data ?? null, updatedAt: document?.updatedAt ?? null, isAdmin: auth === "ok" },
+          200,
+          cacheable ? PUBLIC_CACHE_CONTROL : "no-store",
+        );
       }
 
       if (request.method === "PUT") {

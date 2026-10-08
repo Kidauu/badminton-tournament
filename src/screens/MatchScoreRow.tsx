@@ -50,8 +50,8 @@ function hasDownstreamResults(match: Match, allMatches: Match[]): boolean {
   return anyDownstream(match);
 }
 
-function resultChipInfo(match: Match, teamsById: Map<string, Team>): { text: string; tone: "win" | "neutral" } {
-  if (!match.result) return { text: "Belum diisi", tone: "neutral" };
+function resultChipInfo(match: Match, teamsById: Map<string, Team>, viewer: boolean): { text: string; tone: "win" | "neutral" } {
+  if (!match.result) return { text: viewer ? "Belum main" : "Belum diisi", tone: "neutral" };
   if (match.result === "1-1") return { text: "Imbang 1–1", tone: "neutral" };
   const winnerLabel = `Tim ${teamsById.get(match.winnerTeamId!)?.seq ?? "?"}`;
   if (match.stage === "semifinal") return { text: `${winnerLabel} ke final`, tone: "win" };
@@ -208,7 +208,7 @@ export function MatchScoreRow({ match, code, teamsById, isOpen, onOpen, onClose 
   const cellCount = match.stage === "group" ? 2 : 3;
   const isDraw = match.result === "1-1";
   const [namesA, namesB] = [teamPlayerNames(teamA, state.participants), teamPlayerNames(teamB, state.participants)];
-  const chip = resultChipInfo(match, teamsById);
+  const chip = resultChipInfo(match, teamsById, role === "viewer");
 
   function handleEditClick() {
     if (hasDownstreamResults(match, state.matches)) {

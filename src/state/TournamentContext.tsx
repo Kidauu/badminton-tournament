@@ -5,15 +5,16 @@ import { createInitialState, migrateState, tournamentReducer } from "./tournamen
 import type { TournamentAction } from "./tournamentReducer";
 import { loadTournamentState, saveTournamentState } from "./persistence";
 import { fetchRemote, loadAdminAuth, makeBasicAuth, pushRemote, saveAdminAuth } from "./remoteSync";
+import { RETRY_MS, nextPollDelay } from "./pollSchedule";
 
 /** admin: boleh ubah & tersinkron · viewer: hanya lihat · local: tanpa server (dev) */
 export type TournamentRole = "admin" | "viewer" | "local";
 export type SyncStatus = "synced" | "saving" | "offline";
 export type LoginResult = "ok" | "invalid" | "blocked" | "error";
 
-const VIEWER_POLL_MS = 10_000;
-const RETRY_MS = 5_000;
 const PUSH_DEBOUNCE_MS = 500;
+
+type PullOutcome = "changed" | "unchanged" | "failed";
 
 interface TournamentContextValue {
   state: TournamentState;
@@ -62,24 +63,28 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     if (syncedJsonRef.current !== JSON.stringify(stateRef.current)) rawDispatch({ type: "IMPORT_TOURNAMENT", state: migrated });
   }, []);
 
-  const pull = useCallback(async () => {
+  const pull = useCallback(async (): Promise<PullOutcome> => {
     const result = await fetchRemote(authRef.current);
     if (result.kind === "unavailable") {
       setRole("local");
       setReady(true);
-      return;
+      return "unchanged";
     }
     if (result.kind === "offline" || result.kind === "blocked") {
       setSyncStatus("offline");
-      return;
+      return "failed";
     }
     if (authRef.current && !result.isAdmin) {
       authRef.current = null;
       saveAdminAuth(null);
     }
     setRole(authRef.current ? "admin" : "viewer");
+    let outcome: PullOutcome = "unchanged";
     if (result.data) {
-      if (!pulledRef.current || result.updatedAt !== remoteVersionRef.current) adopt(result.data, result.updatedAt);
+      if (!pulledRef.current || result.updatedAt !== remoteVersionRef.current) {
+        adopt(result.data, result.updatedAt);
+        outcome = "changed";
+      }
     } else {
       // Server masih kosong: data lokal admin menjadi data awal bersama.
       remoteVersionRef.current = null;
@@ -88,20 +93,53 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     pulledRef.current = true;
     setSyncStatus("synced");
     setReady(true);
+    return outcome;
   }, [adopt]);
 
-  // Tarik data saat dibuka, ulangi sampai berhasil, lalu polling untuk penonton.
+  // Tarik data saat dibuka (ulangi sampai berhasil), lalu polling untuk penonton.
+  // Hemat kuota: berhenti saat tab tersembunyi, melambat saat data tidak berubah,
+  // dan jeda dilipatgandakan saat server bermasalah (lihat pollSchedule.ts).
   useEffect(() => {
     if (role === "local") return;
-    if (!ready) {
-      void pull();
-      const retry = setInterval(() => void pull(), RETRY_MS);
-      return () => clearInterval(retry);
-    }
-    if (role === "viewer") {
-      const poll = setInterval(() => void pull(), VIEWER_POLL_MS);
-      return () => clearInterval(poll);
-    }
+    if (ready && role !== "viewer") return; // admin hanya menarik ulang saat tab kembali aktif (efek di bawah)
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
+    let inFlight = false;
+    let failures = 0;
+    let unchanged = 0;
+
+    const schedule = () => {
+      clearTimeout(timer);
+      if (stopped || document.visibilityState !== "visible") return;
+      timer = setTimeout(() => void tick(), nextPollDelay({ ready, failures, unchanged }));
+    };
+    const tick = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      const outcome = await pull();
+      inFlight = false;
+      if (stopped) return;
+      failures = outcome === "failed" ? failures + 1 : 0;
+      unchanged = outcome === "unchanged" ? unchanged + 1 : 0;
+      schedule();
+    };
+    const onVisibility = () => {
+      clearTimeout(timer);
+      if (document.visibilityState === "visible") {
+        unchanged = 0;
+        void tick();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    if (ready) schedule();
+    else void tick();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [pull, ready, role]);
 
   // Admin di perangkat lain bisa saja sudah mengubah data: tarik ulang saat tab kembali aktif.

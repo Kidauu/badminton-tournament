@@ -1,6 +1,8 @@
 import type { TournamentState } from "../types/tournament";
 
 const API_URL = "/api/state";
+/** Pembacaan publik (tanpa login) boleh di-cache beberapa detik oleh CDN Vercel. */
+const PUBLIC_API_URL = "/api/state?public=1";
 const AUTH_KEY = "badminton-tournament:admin-auth";
 
 export type RemoteResult =
@@ -40,7 +42,7 @@ export function saveAdminAuth(auth: string | null): void {
 
 export async function fetchRemote(auth: string | null): Promise<RemoteResult> {
   try {
-    const response = await fetch(API_URL, { headers: auth ? { authorization: auth } : {}, cache: "no-store" });
+    const response = await fetch(auth ? API_URL : PUBLIC_API_URL, { headers: auth ? { authorization: auth } : {}, cache: "no-store" });
     if (response.status === 429) return { kind: "blocked" };
     if (response.status === 404) return { kind: "unavailable" };
     if (!response.ok) return { kind: "offline" };

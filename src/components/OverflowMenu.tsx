@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, MoreHorizontal, RotateCcw, Upload } from "lucide-react";
+import { Download, LogIn, LogOut, MoreHorizontal, RotateCcw, Upload } from "lucide-react";
 import { useTournament } from "../state/TournamentContext";
 import { createBackup, parseBackup } from "../logic/backup";
 
@@ -15,7 +15,7 @@ function downloadFile(filename: string, content: string, type: string) {
 }
 
 export function OverflowMenu() {
-  const { state, dispatch } = useTournament();
+  const { state, dispatch, role, syncStatus, login, logout } = useTournament();
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -87,6 +87,19 @@ export function OverflowMenu() {
     reader.readAsText(file);
   }
 
+  async function handleLogin() {
+    setOpen(false);
+    const pin = window.prompt("Masukkan PIN admin:");
+    if (!pin) return;
+    setToast((await login(pin.trim())) ? "Masuk sebagai admin." : "PIN salah atau server tidak dapat dihubungi.");
+  }
+
+  function handleLogout() {
+    setOpen(false);
+    logout();
+    setToast("Keluar dari mode admin.");
+  }
+
   function openResetDialog() {
     setOpen(false);
     setConfirmOpen(true);
@@ -113,19 +126,36 @@ export function OverflowMenu() {
 
       {open && (
         <div className="overflow-menu" role="menu">
+          {role === "viewer" && (
+            <button type="button" role="menuitem" className="overflow-menu-item" onClick={() => void handleLogin()}>
+              <LogIn size={18} />
+              Masuk admin
+            </button>
+          )}
+          {role === "admin" && (
+            <button type="button" role="menuitem" className="overflow-menu-item" onClick={handleLogout}>
+              <LogOut size={18} />
+              Keluar admin ({syncStatus === "synced" ? "tersimpan" : syncStatus === "saving" ? "menyimpan…" : "offline"})
+            </button>
+          )}
+          {role !== "local" && <div className="overflow-menu-divider" />}
           <button type="button" role="menuitem" className="overflow-menu-item" onClick={exportBackup}>
             <Download size={18} />
             Backup data (.json)
           </button>
-          <button type="button" role="menuitem" className="overflow-menu-item" onClick={requestRestore}>
-            <Upload size={18} />
-            Restore dari backup
-          </button>
-          <div className="overflow-menu-divider" />
-          <button type="button" role="menuitem" className="overflow-menu-item overflow-menu-item-danger" onClick={openResetDialog}>
-            <RotateCcw size={18} />
-            Reset turnamen…
-          </button>
+          {role !== "viewer" && (
+            <>
+              <button type="button" role="menuitem" className="overflow-menu-item" onClick={requestRestore}>
+                <Upload size={18} />
+                Restore dari backup
+              </button>
+              <div className="overflow-menu-divider" />
+              <button type="button" role="menuitem" className="overflow-menu-item overflow-menu-item-danger" onClick={openResetDialog}>
+                <RotateCcw size={18} />
+                Reset turnamen…
+              </button>
+            </>
+          )}
         </div>
       )}
 

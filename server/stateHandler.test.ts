@@ -66,6 +66,24 @@ describe("state handler", () => {
     expect(((await (await get(basic(USERNAME, "salah"))).json()) as { isAdmin: boolean }).isAdmin).toBe(false);
   });
 
+  it("hanya bacaan publik (?public=1 tanpa login) yang boleh di-cache CDN", async () => {
+    const cacheControl = async (url: string, authorization?: string) =>
+      (await handler(new Request(url, { headers: authorization ? { authorization } : {} }))).headers.get("cache-control");
+
+    expect(await cacheControl("http://x/api/state?public=1")).toContain("s-maxage=5");
+    expect(await cacheControl("http://x/api/state")).toBe("no-store");
+    expect(await cacheControl("http://x/api/state?public=0")).toBe("no-store");
+    expect(await cacheControl("http://x/api/state?public=1", basic(USERNAME, PASSWORD))).toBe("no-store");
+    expect(await cacheControl("http://x/api/state?public=1", basic(USERNAME, "salah"))).toBe("no-store");
+  });
+
+  it("tulis dan respons error tidak pernah di-cache", async () => {
+    expect((await put({ a: 1 }, null)).headers.get("cache-control")).toBe("no-store");
+    expect((await put({ a: 1 }, null, basic(USERNAME, "salah"))).headers.get("cache-control")).toBe("no-store");
+    const unconfigured = createStateHandler({ redisUrl: undefined, redisToken: undefined, adminUsername: undefined, adminPassword: undefined });
+    expect((await unconfigured(new Request("http://x/api/state?public=1"))).headers.get("cache-control")).toBe("no-store");
+  });
+
   it("memblokir setelah terlalu banyak percobaan gagal", async () => {
     for (let i = 0; i < 10; i += 1) await get(basic(USERNAME, "salah"));
     expect((await get(basic(USERNAME, "salah"))).status).toBe(429);

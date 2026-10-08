@@ -11,7 +11,7 @@ const MIN_PARTICIPANT_COUNT = 4;
 const STEP = 2;
 
 export function ParticipantsScreen({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
-  const { state, dispatch } = useTournament();
+  const { state, dispatch, role } = useTournament();
   const locked = state.teams.length > 0;
 
   const [names, setNames] = useState<string[]>(() =>
@@ -113,6 +113,14 @@ export function ParticipantsScreen({ onNavigate }: { onNavigate: (tab: TabId) =>
             );
           })}
         </div>
+      </section>
+    );
+  }
+
+  if (role === "viewer") {
+    return (
+      <section>
+        <PageHeader title="Peserta" description="Daftar peserta belum dibuat. Menunggu admin memulai turnamen." />
       </section>
     );
   }

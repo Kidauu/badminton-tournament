@@ -1,14 +1,17 @@
 import { useTournament } from "../state/TournamentContext";
 
 export function SyncBanner() {
-  const { role, syncStatus } = useTournament();
+  const { role, syncStatus, openLogin } = useTournament();
 
   if (role === "viewer") {
     return (
       <div className="sync-banner" role="status">
         {syncStatus === "offline"
           ? "Tidak bisa terhubung ke server — menampilkan data terakhir."
-          : "Mode lihat saja · data diperbarui otomatis. Menu ⋯ → Masuk admin untuk mengubah skor."}
+          : "Mode lihat saja · data diperbarui otomatis."}{" "}
+        <button type="button" className="sync-banner-link" onClick={openLogin}>
+          Masuk admin
+        </button>
       </div>
     );
   }

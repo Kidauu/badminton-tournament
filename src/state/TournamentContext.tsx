@@ -4,11 +4,12 @@ import type { TournamentState } from "../types/tournament";
 import { createInitialState, migrateState, tournamentReducer } from "./tournamentReducer";
 import type { TournamentAction } from "./tournamentReducer";
 import { loadTournamentState, saveTournamentState } from "./persistence";
-import { fetchRemote, loadAdminPin, pushRemote, saveAdminPin } from "./remoteSync";
+import { fetchRemote, loadAdminAuth, makeBasicAuth, pushRemote, saveAdminAuth } from "./remoteSync";
 
 /** admin: boleh ubah & tersinkron · viewer: hanya lihat · local: tanpa server (dev) */
 export type TournamentRole = "admin" | "viewer" | "local";
 export type SyncStatus = "synced" | "saving" | "offline";
+export type LoginResult = "ok" | "invalid" | "blocked" | "error";
 
 const VIEWER_POLL_MS = 10_000;
 const RETRY_MS = 5_000;
@@ -19,8 +20,11 @@ interface TournamentContextValue {
   dispatch: Dispatch<TournamentAction>;
   role: TournamentRole;
   syncStatus: SyncStatus;
-  login: (pin: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => void;
+  loginOpen: boolean;
+  openLogin: () => void;
+  closeLogin: () => void;
 }
 
 const TournamentContext = createContext<TournamentContextValue | null>(null);
@@ -34,12 +38,13 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
       return loaded ? migrateState(loaded) : createInitialState();
     },
   );
-  const [role, setRole] = useState<TournamentRole>(() => (loadAdminPin() ? "admin" : "viewer"));
+  const [role, setRole] = useState<TournamentRole>(() => (loadAdminAuth() ? "admin" : "viewer"));
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("saving");
   const [ready, setReady] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
+  const [loginOpen, setLoginOpen] = useState(false);
 
-  const pinRef = useRef<string | null>(loadAdminPin());
+  const authRef = useRef<string | null>(loadAdminAuth());
   const pulledRef = useRef(false);
   const remoteVersionRef = useRef<string | null>(null);
   const syncedJsonRef = useRef<string | null>(null);
@@ -58,21 +63,21 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const pull = useCallback(async () => {
-    const result = await fetchRemote(pinRef.current);
+    const result = await fetchRemote(authRef.current);
     if (result.kind === "unavailable") {
       setRole("local");
       setReady(true);
       return;
     }
-    if (result.kind === "offline") {
+    if (result.kind === "offline" || result.kind === "blocked") {
       setSyncStatus("offline");
       return;
     }
-    if (pinRef.current && !result.isAdmin) {
-      pinRef.current = null;
-      saveAdminPin(null);
+    if (authRef.current && !result.isAdmin) {
+      authRef.current = null;
+      saveAdminAuth(null);
     }
-    setRole(pinRef.current ? "admin" : "viewer");
+    setRole(authRef.current ? "admin" : "viewer");
     if (result.data) {
       if (!pulledRef.current || result.updatedAt !== remoteVersionRef.current) adopt(result.data, result.updatedAt);
     } else {
@@ -116,9 +121,9 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     if (json === syncedJsonRef.current) return;
     setSyncStatus("saving");
     const timer = setTimeout(async () => {
-      const pin = pinRef.current;
-      if (!pin) return;
-      const result = await pushRemote(pin, state, remoteVersionRef.current);
+      const auth = authRef.current;
+      if (!auth) return;
+      const result = await pushRemote(auth, state, remoteVersionRef.current);
       if (result.kind === "ok") {
         remoteVersionRef.current = result.updatedAt;
         syncedJsonRef.current = json;
@@ -129,8 +134,8 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
         adopt(result.data, result.updatedAt);
         setSyncStatus("synced");
       } else if (result.kind === "unauthorized") {
-        pinRef.current = null;
-        saveAdminPin(null);
+        authRef.current = null;
+        saveAdminAuth(null);
         setRole("viewer");
       } else {
         setSyncStatus("offline");
@@ -148,26 +153,33 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     [role],
   );
 
-  const login = useCallback(async (pin: string) => {
-    const result = await fetchRemote(pin);
-    if (result.kind !== "ok" || !result.isAdmin) return false;
-    pinRef.current = pin;
-    saveAdminPin(pin);
+  const login = useCallback(async (username: string, password: string): Promise<LoginResult> => {
+    const auth = makeBasicAuth(username, password);
+    const result = await fetchRemote(auth);
+    if (result.kind === "blocked") return "blocked";
+    if (result.kind !== "ok") return "error";
+    if (!result.isAdmin) return "invalid";
+    authRef.current = auth;
+    saveAdminAuth(auth);
     pulledRef.current = false;
     setReady(false);
     setRole("admin");
-    return true;
+    setLoginOpen(false);
+    return "ok";
   }, []);
 
+  const openLogin = useCallback(() => setLoginOpen(true), []);
+  const closeLogin = useCallback(() => setLoginOpen(false), []);
+
   const logout = useCallback(() => {
-    pinRef.current = null;
-    saveAdminPin(null);
+    authRef.current = null;
+    saveAdminAuth(null);
     setRole("viewer");
   }, []);
 
   const value = useMemo(
-    () => ({ state, dispatch, role, syncStatus, login, logout }),
-    [state, dispatch, role, syncStatus, login, logout],
+    () => ({ state, dispatch, role, syncStatus, login, logout, loginOpen, openLogin, closeLogin }),
+    [state, dispatch, role, syncStatus, login, logout, loginOpen, openLogin, closeLogin],
   );
 
   return <TournamentContext.Provider value={value}>{children}</TournamentContext.Provider>;

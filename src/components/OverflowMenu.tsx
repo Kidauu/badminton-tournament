@@ -15,7 +15,7 @@ function downloadFile(filename: string, content: string, type: string) {
 }
 
 export function OverflowMenu() {
-  const { state, dispatch, role, syncStatus, login, logout } = useTournament();
+  const { state, dispatch, role, syncStatus, openLogin, logout } = useTournament();
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -87,11 +87,9 @@ export function OverflowMenu() {
     reader.readAsText(file);
   }
 
-  async function handleLogin() {
+  function handleLogin() {
     setOpen(false);
-    const pin = window.prompt("Masukkan PIN admin:");
-    if (!pin) return;
-    setToast((await login(pin.trim())) ? "Masuk sebagai admin." : "PIN salah atau server tidak dapat dihubungi.");
+    openLogin();
   }
 
   function handleLogout() {
@@ -127,7 +125,7 @@ export function OverflowMenu() {
       {open && (
         <div className="overflow-menu" role="menu">
           {role === "viewer" && (
-            <button type="button" role="menuitem" className="overflow-menu-item" onClick={() => void handleLogin()}>
+            <button type="button" role="menuitem" className="overflow-menu-item" onClick={handleLogin}>
               <LogIn size={18} />
               Masuk admin
             </button>

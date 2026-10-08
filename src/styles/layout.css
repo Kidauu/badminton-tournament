@@ -2211,3 +2211,17 @@
     padding: 0;
   }
 }
+
+.sync-banner {
+  background: var(--court-tint);
+  color: var(--court-hover);
+  font-size: 13px;
+  line-height: 1.4;
+  padding: var(--sp-2) var(--gutter);
+  text-align: center;
+}
+
+.sync-banner-warn {
+  background: #fdecea;
+  color: var(--danger);
+}

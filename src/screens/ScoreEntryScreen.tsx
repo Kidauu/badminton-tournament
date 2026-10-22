@@ -161,7 +161,7 @@ export function ScoreEntryScreen({ onNavigate }: { onNavigate: (tab: TabId) => v
           matches={knockout}
           codes={knockoutCodes}
           teamsById={teamsById}
-          waitingMessage="Babak gugur terbuka setelah semua pertandingan grup selesai."
+          waitingMessage="Pertandingan babak gugur muncul di sini begitu kedua timnya sudah pasti."
           openId={openId}
           setOpenId={setOpenId}
         />

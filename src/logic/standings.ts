@@ -159,3 +159,73 @@ function tieKeysFor(row: StandingsRow): TieKeys {
 function compareTieKeys(a: TieKeys, b: TieKeys): number {
   return a.pointDiff - b.pointDiff;
 }
+
+export interface ClinchedPositions {
+  /** Tim yang pasti juara grup, apa pun hasil sisa pertandingan; null jika belum pasti. */
+  first: string | null;
+  /** Tim yang pasti runner-up grup, apa pun hasil sisa pertandingan; null jika belum pasti. */
+  second: string | null;
+}
+
+const MAX_REMAINING_MATCHES = 10;
+
+/**
+ * Posisi grup yang sudah pasti walau sisa pertandingan belum dimainkan.
+ * Semua kemungkinan hasil sisa pertandingan (menang 2–0, imbang 1–1, kalah 0–2) dicoba.
+ * Posisi dianggap pasti hanya jika poinnya SELALU lebih tinggi secara ketat dari tim lain
+ * (selisih poin tidak diperhitungkan karena nilainya tidak terbatas), sehingga tidak pernah salah menebak.
+ */
+export function clinchedPositions(teams: Team[], matches: Match[], groupId: GroupId): ClinchedPositions {
+  const ids = teams.map((t) => t.id);
+  const idSet = new Set(ids);
+  const base = new Map(ids.map((id) => [id, 0]));
+  const remaining: [string, string][] = [];
+
+  for (const m of matches) {
+    if (m.stage !== "group" || m.groupId !== groupId || !m.teamAId || !m.teamBId) continue;
+    if (!idSet.has(m.teamAId) || !idSet.has(m.teamBId)) continue;
+    if (!m.result) {
+      remaining.push([m.teamAId, m.teamBId]);
+    } else if (m.result === "2-0") {
+      const winner = m.winnerTeamId === m.teamAId ? m.teamAId : m.teamBId;
+      base.set(winner, (base.get(winner) ?? 0) + 3);
+    } else if (m.result === "1-1") {
+      base.set(m.teamAId, (base.get(m.teamAId) ?? 0) + 1);
+      base.set(m.teamBId, (base.get(m.teamBId) ?? 0) + 1);
+    }
+  }
+  if (ids.length < 2 || remaining.length > MAX_REMAINING_MATCHES) return { first: null, second: null };
+
+  const alwaysFirst = new Set(ids);
+  const alwaysSecond = new Set(ids);
+
+  function visit(index: number, points: Map<string, number>): void {
+    if (index === remaining.length) {
+      for (const id of ids) {
+        const mine = points.get(id) ?? 0;
+        let above = 0;
+        let tied = 0;
+        for (const other of ids) {
+          if (other === id) continue;
+          const theirs = points.get(other) ?? 0;
+          if (theirs > mine) above += 1;
+          else if (theirs === mine) tied += 1;
+        }
+        if (!(above === 0 && tied === 0)) alwaysFirst.delete(id);
+        if (!(above === 1 && tied === 0)) alwaysSecond.delete(id);
+      }
+      return;
+    }
+    if (alwaysFirst.size === 0 && alwaysSecond.size === 0) return;
+    const [a, b] = remaining[index];
+    for (const [pa, pb] of [[3, 0], [1, 1], [0, 3]] as const) {
+      const next = new Map(points);
+      next.set(a, (next.get(a) ?? 0) + pa);
+      next.set(b, (next.get(b) ?? 0) + pb);
+      visit(index + 1, next);
+    }
+  }
+  visit(0, base);
+
+  return { first: [...alwaysFirst][0] ?? null, second: [...alwaysSecond][0] ?? null };
+}

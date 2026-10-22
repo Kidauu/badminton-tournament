@@ -1,7 +1,7 @@
 import type { ByeEntry, Match, MatchOperationalStatus, MatchSetScores, Participant, SetResult, Team, TournamentState } from "../types/tournament";
 import { pairsFromShuffled, shuffleParticipants } from "../logic/pairing";
 import { generateGroupTournament } from "../logic/schedule";
-import { computeStandings, teamsInGroup } from "../logic/standings";
+import { clinchedPositions, computeStandings, teamsInGroup } from "../logic/standings";
 import { outcomeFromScores } from "../logic/scoring";
 
 export type TournamentAction =
@@ -108,18 +108,33 @@ function seedKnockoutFromGroups(
   manualGroupRankings: TournamentState["manualGroupRankings"],
 ): ByeEntry[] {
   const groupMatches = matches.filter((match) => match.stage === "group");
-  if (!groupMatches.every((match) => match.result !== null)) return [];
-  const groupA = orderedGroupTeamIds(state, groupMatches, "A", manualGroupRankings);
-  const groupB = orderedGroupTeamIds(state, groupMatches, "B", manualGroupRankings);
-  if (!groupA || !groupB) return [];
-
   const semifinal1 = matches.find((match) => match.id === "semifinal-1");
   const semifinal2 = matches.find((match) => match.id === "semifinal-2");
   if (!semifinal1 || !semifinal2) return [];
-  semifinal1.teamAId = groupA[0] ?? null;
-  semifinal1.teamBId = groupB[1] ?? null;
-  semifinal2.teamAId = groupB[0] ?? null;
-  semifinal2.teamBId = groupA[1] ?? null;
+
+  // Posisi grup yang sudah pasti langsung masuk bagan, tanpa menunggu semua pertandingan grup selesai.
+  // Setelah grup selesai dipakai urutan final (termasuk undian manual); selama belum, hanya posisi yang pasti.
+  const allGroupsDone = groupMatches.every((match) => match.result !== null);
+  const positions = (groupId: "A" | "B"): { first: string | null; second: string | null; settled: boolean } => {
+    const groupTeams = teamsInGroup(state.teams, state.groupAssignments, groupId);
+    if (allGroupsDone) {
+      const ordered = orderedGroupTeamIds(state, groupMatches, groupId, manualGroupRankings);
+      if (ordered) return { first: ordered[0] ?? null, second: ordered[1] ?? null, settled: true };
+    }
+    return { ...clinchedPositions(groupTeams, groupMatches, groupId), settled: false };
+  };
+  const groupA = positions("A");
+  const groupB = positions("B");
+  // Hanya mengisi slot yang masih kosong, jadi hasil semifinal yang sudah dimainkan tidak terhapus.
+  const fill = (match: Match, slot: "teamAId" | "teamBId", teamId: string | null) => {
+    if (teamId && !match[slot]) match[slot] = teamId;
+  };
+  fill(semifinal1, "teamAId", groupA.first);
+  fill(semifinal1, "teamBId", groupB.second);
+  fill(semifinal2, "teamAId", groupB.first);
+  fill(semifinal2, "teamBId", groupA.second);
+  // Bye hanya boleh diputuskan setelah kedua grup benar-benar selesai.
+  if (!groupA.settled || !groupB.settled) return [];
   const byes = resolveKnockoutByes(matches.filter((match) => match.stage !== "group"));
   resolveThirdPlaceBye(matches);
   return byes;
@@ -132,6 +147,23 @@ function seedKnockoutFromGroups(
  * loserNextMatchId wiring on its semifinals, so the playoff can never appear.
  */
 export function migrateState(state: TournamentState): TournamentState {
+  return fillClinchedSlots(backfillThirdPlace(state));
+}
+
+/**
+ * Data yang dimuat (penyimpanan lokal, server, backup) bisa saja dibuat sebelum aturan
+ * "posisi grup yang sudah pasti langsung masuk bagan" ada: isi slot kosong yang kini sudah pasti.
+ * Idempotent: tidak mengubah apa pun kalau tidak ada slot baru.
+ */
+function fillClinchedSlots(state: TournamentState): TournamentState {
+  if (!state.matches.some((match) => match.id === "semifinal-1")) return state;
+  const matches = state.matches.map((match) => ({ ...match }));
+  const byes = seedKnockoutFromGroups(state, matches, state.manualGroupRankings);
+  if (JSON.stringify(matches) === JSON.stringify(state.matches)) return state;
+  return { ...state, matches, byes: byes.length > 0 ? byes : state.byes };
+}
+
+function backfillThirdPlace(state: TournamentState): TournamentState {
   const hasFinal = state.matches.some((m) => m.id === "final");
   const hasThirdPlace = state.matches.some((m) => m.id === "third-place");
   if (!hasFinal || hasThirdPlace) return state;
@@ -248,6 +280,11 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
           operationalStatus: "completed" as const,
         } : { ...m }));
         const knockoutMatches = matches.filter((m) => m.stage !== "group");
+        if (match.result === null) {
+          // Hasil baru: bagan yang sudah terisi/dimainkan dipertahankan, hanya posisi yang baru pasti yang ditambahkan.
+          const byes = seedKnockoutFromGroups(state, matches, state.manualGroupRankings);
+          return { ...state, matches, byes: byes.length > 0 ? byes : state.byes };
+        }
         for (const knockoutMatch of knockoutMatches) {
           knockoutMatch.teamAId = null;
           knockoutMatch.teamBId = null;
@@ -359,7 +396,8 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
           }
           return { ...item };
         });
-        return { ...state, manualGroupRankings: [], matches, byes: [] };
+        const byes = seedKnockoutFromGroups(state, matches, []);
+        return { ...state, manualGroupRankings: [], matches, byes };
       }
 
       const matches = state.matches.map((item) => ({ ...item }));

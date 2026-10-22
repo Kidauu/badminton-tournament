@@ -113,8 +113,11 @@ describe("tournamentReducer group qualification", () => {
       state = tournamentReducer(state, { type: "RECORD_RESULT", matchId, result: "2-0", winnerTeamId });
     }
 
+    // Grup A belum bisa diurutkan (semua imbang): slot Grup A tetap kosong. Grup B sudah pasti: t5 juara, t6 runner-up.
     expect(state.matches.find((match) => match.id === "semifinal-1")!.teamAId).toBeNull();
-    expect(state.matches.find((match) => match.id === "semifinal-2")!.teamAId).toBeNull();
+    expect(state.matches.find((match) => match.id === "semifinal-1")!.teamBId).toBe("t6");
+    expect(state.matches.find((match) => match.id === "semifinal-2")!.teamAId).toBe("t5");
+    expect(state.matches.find((match) => match.id === "semifinal-2")!.teamBId).toBeNull();
 
     state = tournamentReducer(state, { type: "SET_MANUAL_GROUP_RANKING", groupId: "A", teamIds: ["t3", "t1", "t2", "t4"] });
     const semifinal1 = state.matches.find((match) => match.id === "semifinal-1")!;
@@ -150,9 +153,65 @@ describe("tournamentReducer group qualification", () => {
 
     state = tournamentReducer(state, { type: "RESET_MATCH_SCORES", matchId: "group-A-1-2" });
 
-    expect(state.matches.filter((match) => match.stage !== "group").every((match) => (
-      match.teamAId === null && match.teamBId === null && match.result === null && match.winnerTeamId === null
-    ))).toBe(true);
+    // Hasil bagan terhapus; Grup A belum pasti lagi (slotnya kosong), Grup B sudah pasti dan tetap terisi.
+    const knockout = state.matches.filter((match) => match.stage !== "group");
+    expect(knockout.every((match) => match.result === null && match.winnerTeamId === null)).toBe(true);
+    const sf1 = state.matches.find((match) => match.id === "semifinal-1")!;
+    const sf2 = state.matches.find((match) => match.id === "semifinal-2")!;
+    expect([sf1.teamAId, sf1.teamBId, sf2.teamAId, sf2.teamBId]).toEqual([null, "t6", "t5", null]);
+  });
+
+  it("langsung memasukkan juara/runner-up yang sudah pasti ke bagan tanpa menunggu grup selesai", () => {
+    let state = makeState();
+    const sf = (id: string) => state.matches.find((match) => match.id === id)!;
+    // t5 menang atas t6 dan t7: juara Grup B pasti (6 poin; t6 vs t7 belum main, maksimal 3).
+    state = tournamentReducer(state, { type: "RECORD_RESULT", matchId: "group-B-1-2", result: "2-0", winnerTeamId: "t5" });
+    expect(sf("semifinal-2").teamAId).toBeNull();
+    state = tournamentReducer(state, { type: "RECORD_RESULT", matchId: "group-B-1-3", result: "2-0", winnerTeamId: "t5" });
+    expect(sf("semifinal-2").teamAId).toBe("t5");
+    expect(sf("semifinal-1").teamBId).toBeNull(); // runner-up B belum pasti
+    expect(state.byes).toEqual([]);
+
+    // t6 menang atas t7: Grup B selesai, runner-up pasti t6.
+    state = tournamentReducer(state, { type: "RECORD_RESULT", matchId: "group-B-2-3", result: "2-0", winnerTeamId: "t6" });
+    expect(sf("semifinal-1").teamBId).toBe("t6");
+  });
+
+  it("migrateState mengisi bagan dari posisi yang sudah pasti pada data lama", () => {
+    let state = makeState();
+    for (const [matchId, winnerTeamId] of [["group-B-1-2", "t5"], ["group-B-1-3", "t5"]] as const) {
+      state = tournamentReducer(state, { type: "RECORD_RESULT", matchId, result: "2-0", winnerTeamId });
+    }
+    // Simulasikan data lama: bagan dikosongkan seolah dibuat sebelum aturan baru.
+    const old: TournamentState = { ...state, matches: state.matches.map((m) => (m.stage === "group" ? m : { ...m, teamAId: null, teamBId: null })) };
+    const migrated = migrateState(old);
+    expect(migrated.matches.find((m) => m.id === "semifinal-2")!.teamAId).toBe("t5");
+    expect(migrateState(migrated)).toBe(migrated);
+  });
+
+  it("tidak menghapus hasil semifinal yang sudah dimainkan saat pertandingan grup lain dicatat", () => {
+    let state = makeState();
+    const sf = (id: string) => state.matches.find((match) => match.id === id)!;
+    for (const [matchId, winnerTeamId] of [["group-B-1-2", "t5"], ["group-B-1-3", "t5"], ["group-B-2-3", "t6"]] as const) {
+      state = tournamentReducer(state, { type: "RECORD_RESULT", matchId, result: "2-0", winnerTeamId });
+    }
+    // t1 menang 3 kali: juara Grup A pasti; runner-up A belum pasti, jadi semifinal-1 belum punya lawan lengkap.
+    for (const matchId of ["group-A-1-2", "group-A-1-3", "group-A-1-4"]) {
+      state = tournamentReducer(state, { type: "RECORD_RESULT", matchId, result: "2-0", winnerTeamId: "t1" });
+    }
+    expect([sf("semifinal-1").teamAId, sf("semifinal-1").teamBId]).toEqual(["t1", "t6"]);
+    expect(sf("semifinal-1").isBye).toBeFalsy(); // jangan salah dianggap bye saat slot lawan belum terisi
+
+    state = tournamentReducer(state, { type: "RECORD_RESULT", matchId: "semifinal-1", result: "2-0", winnerTeamId: "t1" });
+    expect(sf("final").teamAId).toBe("t1");
+
+    // Pertandingan grup yang tersisa dicatat: hasil semifinal-1 harus tetap ada.
+    state = tournamentReducer(state, { type: "RECORD_RESULT", matchId: "group-A-2-3", result: "2-0", winnerTeamId: "t2" });
+    state = tournamentReducer(state, { type: "RECORD_RESULT", matchId: "group-A-2-4", result: "2-0", winnerTeamId: "t2" });
+    state = tournamentReducer(state, { type: "RECORD_RESULT", matchId: "group-A-3-4", result: "2-0", winnerTeamId: "t3" });
+    expect(sf("semifinal-1").winnerTeamId).toBe("t1");
+    expect(sf("final").teamAId).toBe("t1");
+    expect([sf("semifinal-2").teamAId, sf("semifinal-2").teamBId]).toEqual(["t5", "t2"]);
   });
 
   it("migrateState backfills a third-place match onto a pre-existing tournament that predates the feature", () => {

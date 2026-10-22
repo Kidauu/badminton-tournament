@@ -22,6 +22,14 @@ function makeState(): TournamentState {
 }
 
 describe("tournamentReducer group qualification", () => {
+  it("records a group walkover as a 2-0 win with no point scores", () => {
+    let state = makeState();
+    state = tournamentReducer(state, { type: "RECORD_WALKOVER", matchId: "group-A-1-2", winnerTeamId: "t1" });
+
+    const match = state.matches.find((item) => item.id === "group-A-1-2")!;
+    expect(match).toMatchObject({ result: "2-0", winnerTeamId: "t1", isWalkover: true, setScores: null, operationalStatus: "completed" });
+  });
+
   it("replaces the current tournament through an imported backup state", () => {
     const imported = makeState();
     const result = tournamentReducer({ ...makeState(), teams: [] }, { type: "IMPORT_TOURNAMENT", state: imported });

@@ -164,7 +164,7 @@ export function ChampionScreen({ onNavigate }: { onNavigate: (tab: TabId) => voi
                 </div>
                 <div className="journey-card-row">
                   <span>Hasil</span>
-                  <span>{championSemifinal.isBye ? "Menang WO" : `Menang ${championSemifinal.result?.replace("-", "–")}`}</span>
+                  <span>{championSemifinal.isBye || championSemifinal.isWalkover ? "Menang WO" : `Menang ${championSemifinal.result?.replace("-", "–")}`}</span>
                 </div>
               </>
             ) : (

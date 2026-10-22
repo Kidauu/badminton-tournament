@@ -42,6 +42,10 @@ export interface Match {
   loserNextMatchSlot?: "A" | "B" | null;
   /** True when the winner advanced by walkover because the opposing group had no runner-up. */
   isBye?: boolean;
+  /** True when an assigned opponent did not attend. Unlike a bye, both teams
+   * are present in the fixture and the result counts as a 2–0 win; no set
+   * scores are recorded, so it never changes the point-difference tiebreak. */
+  isWalkover?: boolean;
   court?: string;
   scheduledAt?: string;
   operationalStatus?: MatchOperationalStatus;

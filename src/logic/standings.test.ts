@@ -15,6 +15,15 @@ function drawn1_1(id: string, round: number, teamAId: string, teamBId: string): 
 }
 
 describe("computeStandings", () => {
+  it("awards a walkover win without changing point difference", () => {
+    const teams = [team("t1", 1), team("t2", 2)];
+    const matches: Match[] = [{ ...played2_0("wo", 1, "t1", "t2", "t1"), isWalkover: true, setScores: null }];
+    const byId = new Map(computeStandings(teams, matches).map((row) => [row.teamId, row]));
+
+    expect(byId.get("t1")).toMatchObject({ played: 1, won: 1, points: 3, setsWon: 2, pointDiff: 0 });
+    expect(byId.get("t2")).toMatchObject({ played: 1, lost: 1, points: 0, setsLost: 2, pointDiff: 0 });
+  });
+
   it("breaks a 2-way tie on points using point difference", () => {
     const teams = [team("t1", 1), team("t2", 2), team("t3", 3), team("t4", 4)];
     const matches: Match[] = [

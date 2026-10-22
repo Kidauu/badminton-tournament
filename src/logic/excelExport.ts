@@ -64,14 +64,14 @@ function matchCode(match: Match, groupIndexes: Map<string, number>): string {
 }
 
 function matchResult(match: Match, teamsById: Map<string, Team>): string {
-  if (match.isBye && match.winnerTeamId) return `Menang WO · ${teamLabel(match.winnerTeamId, teamsById)}`;
+  if ((match.isBye || match.isWalkover) && match.winnerTeamId) return `Menang WO · ${teamLabel(match.winnerTeamId, teamsById)}`;
   if (!match.result) return "Belum dimainkan";
   if (match.result === "1-1") return "Imbang 1–1";
   return `${teamLabel(match.winnerTeamId, teamsById)} menang ${match.result}`;
 }
 
 function operationalStatus(match: Match): string {
-  if (match.isBye) return "Walkover";
+  if (match.isBye || match.isWalkover) return "Walkover";
   if (match.result) return "Selesai";
   if (match.operationalStatus === "in_progress") return "Sedang berlangsung";
   return "Terjadwal";

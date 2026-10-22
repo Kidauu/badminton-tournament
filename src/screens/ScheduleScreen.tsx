@@ -94,9 +94,9 @@ function MatchResultCell({ match, teamsById }: { match: Match; teamsById: Map<st
   return (
     <div>
       <span className="match-table-result-main">
-        {match.isBye ? `Menang WO · ${winnerLabel}` : `${match.result} · ${winnerLabel}`}
+        {match.isBye || match.isWalkover ? `Menang WO · ${winnerLabel}` : `${match.result} · ${winnerLabel}`}
       </span>
-      {scores && !match.isBye && <p className="match-table-result-sets">{scores}</p>}
+      {scores && !match.isBye && !match.isWalkover && <p className="match-table-result-sets">{scores}</p>}
     </div>
   );
 }

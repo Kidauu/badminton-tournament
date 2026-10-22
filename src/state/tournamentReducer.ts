@@ -12,6 +12,7 @@ export type TournamentAction =
   | { type: "SET_MATCH_OPERATIONS"; matchId: string; court: string; scheduledAt: string; status: Exclude<MatchOperationalStatus, "completed"> }
   | { type: "RECORD_RESULT"; matchId: string; result: SetResult; winnerTeamId: string | null }
   | { type: "RECORD_SCORES"; matchId: string; setScores: MatchSetScores }
+  | { type: "RECORD_WALKOVER"; matchId: string; winnerTeamId: string }
   | { type: "RESET_MATCH_SCORES"; matchId: string }
   | { type: "IMPORT_TOURNAMENT"; state: TournamentState }
   | { type: "RESET_TOURNAMENT" };
@@ -210,7 +211,8 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
     }
 
     case "RECORD_RESULT":
-    case "RECORD_SCORES": {
+    case "RECORD_SCORES":
+    case "RECORD_WALKOVER": {
       const matchId = action.matchId;
       const match = state.matches.find((m) => m.id === matchId);
       if (!match) return state;
@@ -218,12 +220,16 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
       let result: SetResult;
       let winnerTeamId: string | null;
       let setScores: MatchSetScores | undefined;
+      const isWalkover = action.type === "RECORD_WALKOVER";
       if (action.type === "RECORD_SCORES") {
         const outcome = outcomeFromScores(match.stage, action.setScores);
         if (!outcome) return state;
         result = outcome.result;
         winnerTeamId = outcome.winnerSide === "A" ? match.teamAId : outcome.winnerSide === "B" ? match.teamBId : null;
         setScores = action.setScores;
+      } else if (action.type === "RECORD_WALKOVER") {
+        result = "2-0";
+        winnerTeamId = action.winnerTeamId;
       } else {
         result = action.result;
         winnerTeamId = action.winnerTeamId;
@@ -233,7 +239,14 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
         if (result === "2-0" && winnerTeamId !== match.teamAId && winnerTeamId !== match.teamBId) return state;
         if (result === "1-1" && winnerTeamId !== null) return state;
 
-        const matches = state.matches.map((m) => (m.id === matchId ? { ...m, result, winnerTeamId, operationalStatus: "completed" as const, ...(setScores && { setScores }) } : { ...m }));
+        const matches = state.matches.map((m) => (m.id === matchId ? {
+          ...m,
+          result,
+          winnerTeamId,
+          setScores: isWalkover ? null : setScores ?? m.setScores ?? null,
+          isWalkover,
+          operationalStatus: "completed" as const,
+        } : { ...m }));
         const knockoutMatches = matches.filter((m) => m.stage !== "group");
         for (const knockoutMatch of knockoutMatches) {
           knockoutMatch.teamAId = null;
@@ -242,6 +255,7 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
           knockoutMatch.winnerTeamId = null;
           knockoutMatch.setScores = null;
           knockoutMatch.isBye = false;
+          knockoutMatch.isWalkover = false;
           knockoutMatch.operationalStatus = "scheduled";
         }
 
@@ -267,6 +281,7 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
           target.winnerTeamId = null;
           target.setScores = null;
           target.isBye = false;
+          target.isWalkover = false;
           target.operationalStatus = "scheduled";
           clearDescendants(target);
         }
@@ -292,7 +307,14 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
       }
 
       clearDescendants(matches[matchIndex]);
-      matches[matchIndex] = { ...matches[matchIndex], result, winnerTeamId, operationalStatus: "completed", ...(setScores && { setScores }) };
+      matches[matchIndex] = {
+        ...matches[matchIndex],
+        result,
+        winnerTeamId,
+        setScores: isWalkover ? null : setScores ?? matches[matchIndex].setScores ?? null,
+        isWalkover,
+        operationalStatus: "completed",
+      };
       const updatedMatch = matches[matchIndex];
       if (updatedMatch.nextMatchId && updatedMatch.nextMatchSlot) {
         const target = matches.find((m) => m.id === updatedMatch.nextMatchId);
@@ -320,7 +342,7 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
       if (match.stage === "group") {
         const matches = state.matches.map((item) => {
           if (item.id === match.id) {
-            return { ...item, result: null, winnerTeamId: null, setScores: null, isBye: false, operationalStatus: "scheduled" as const };
+            return { ...item, result: null, winnerTeamId: null, setScores: null, isBye: false, isWalkover: false, operationalStatus: "scheduled" as const };
           }
           if (item.stage !== "group") {
             return {
@@ -331,6 +353,7 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
               winnerTeamId: null,
               setScores: null,
               isBye: false,
+              isWalkover: false,
               operationalStatus: "scheduled" as const,
             };
           }
@@ -348,6 +371,7 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
         source.winnerTeamId = null;
         source.setScores = null;
         source.isBye = false;
+        source.isWalkover = false;
         source.operationalStatus = "scheduled";
 
         for (const [targetId, targetSlot] of [
@@ -398,6 +422,7 @@ export function tournamentReducer(state: TournamentState, action: TournamentActi
         match.winnerTeamId = null;
         match.setScores = null;
         match.isBye = false;
+        match.isWalkover = false;
         match.operationalStatus = "scheduled";
       }
       const manualGroupRankings = [...state.manualGroupRankings.filter((ranking) => ranking.groupId !== action.groupId), { groupId: action.groupId, teamIds: action.teamIds }];

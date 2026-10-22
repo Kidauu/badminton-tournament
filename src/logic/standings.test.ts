@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeStandings } from "./standings";
+import { clinchedPositions, computeStandings } from "./standings";
 import type { Match, Team } from "../types/tournament";
 
 function team(id: string, seq: number): Team {
@@ -15,6 +15,15 @@ function drawn1_1(id: string, round: number, teamAId: string, teamBId: string): 
 }
 
 describe("computeStandings", () => {
+  it("awards a walkover win without changing point difference", () => {
+    const teams = [team("t1", 1), team("t2", 2)];
+    const matches: Match[] = [{ ...played2_0("wo", 1, "t1", "t2", "t1"), isWalkover: true, setScores: null }];
+    const byId = new Map(computeStandings(teams, matches).map((row) => [row.teamId, row]));
+
+    expect(byId.get("t1")).toMatchObject({ played: 1, won: 1, points: 3, setsWon: 2, pointDiff: 0 });
+    expect(byId.get("t2")).toMatchObject({ played: 1, lost: 1, points: 0, setsLost: 2, pointDiff: 0 });
+  });
+
   it("breaks a 2-way tie on points using point difference", () => {
     const teams = [team("t1", 1), team("t2", 2), team("t3", 3), team("t4", 4)];
     const matches: Match[] = [
@@ -103,5 +112,54 @@ describe("computeStandings", () => {
     expect(rows[0].teamId).toBe("t1");
     expect(rows[0].pointDiff).toBeGreaterThan(rows[1].pointDiff);
     expect(rows[1].pointDiff).toBeGreaterThan(rows[2].pointDiff);
+  });
+});
+
+describe("clinchedPositions", () => {
+  const four = [team("t1", 1), team("t2", 2), team("t3", 3), team("t4", 4)];
+  const group = (m: Match): Match => ({ ...m, stage: "group", groupId: "A" });
+  const open = (id: string, a: string, b: string): Match => group({ id, round: 1, teamAId: a, teamBId: b, result: null, winnerTeamId: null });
+
+  it("tidak ada yang pasti sebelum ada hasil", () => {
+    const matches = [open("m1", "t1", "t2"), open("m2", "t1", "t3"), open("m3", "t1", "t4"), open("m4", "t2", "t3"), open("m5", "t2", "t4"), open("m6", "t3", "t4")];
+    expect(clinchedPositions(four, matches, "A")).toEqual({ first: null, second: null });
+  });
+
+  it("juara pasti jika poinnya tak terkejar, runner-up belum pasti", () => {
+    const matches = [
+      group(played2_0("m1", 1, "t1", "t2", "t1")), group(played2_0("m2", 1, "t1", "t3", "t1")), group(played2_0("m3", 1, "t1", "t4", "t1")),
+      open("m4", "t2", "t3"), open("m5", "t2", "t4"), open("m6", "t3", "t4"),
+    ];
+    expect(clinchedPositions(four, matches, "A")).toEqual({ first: "t1", second: null });
+  });
+
+  it("tidak pasti jika masih bisa sama poin (selisih poin tidak dianggap)", () => {
+    // t1 menang 2x (6 poin), t2 menang 2x (6 poin), t1 vs t2 belum main.
+    const matches = [
+      group(played2_0("m1", 1, "t1", "t3", "t1")), group(played2_0("m2", 1, "t1", "t4", "t1")),
+      group(played2_0("m3", 1, "t2", "t3", "t2")), group(played2_0("m4", 1, "t2", "t4", "t2")),
+      open("m5", "t1", "t2"), group(played2_0("m6", 1, "t3", "t4", "t3")),
+    ];
+    expect(clinchedPositions(four, matches, "A")).toEqual({ first: null, second: null });
+  });
+
+  it("runner-up pasti ketika dua tim teratas sudah terpisah dari sisanya", () => {
+    // t1 & t2 masing-masing 6 poin dan sudah pasti di atas t3 (maks 3) dan t4 (0); t1 vs t2 belum main.
+    const matches = [
+      group(played2_0("m1", 1, "t1", "t3", "t1")), group(played2_0("m2", 1, "t1", "t4", "t1")),
+      group(played2_0("m3", 1, "t2", "t3", "t2")), group(played2_0("m4", 1, "t2", "t4", "t2")),
+      open("m5", "t1", "t2"), group(played2_0("m6", 1, "t3", "t4", "t3")),
+    ];
+    const three = [team("t1", 1), team("t2", 2), team("t3", 3)];
+    const m3 = [group(played2_0("a", 1, "t1", "t3", "t1")), group(played2_0("b", 1, "t2", "t3", "t2")), open("c", "t1", "t2")];
+    // t1 vs t2 belum main: keduanya pasti di dua teratas, tapi urutannya belum pasti.
+    expect(clinchedPositions(three, m3, "A")).toEqual({ first: null, second: null });
+    expect(matches.length).toBe(6);
+  });
+
+  it("grup yang sudah selesai dengan urutan jelas", () => {
+    const three = [team("t1", 1), team("t2", 2), team("t3", 3)];
+    const matches = [group(played2_0("a", 1, "t1", "t2", "t1")), group(played2_0("b", 1, "t1", "t3", "t1")), group(played2_0("c", 1, "t2", "t3", "t2"))];
+    expect(clinchedPositions(three, matches, "A")).toEqual({ first: "t1", second: "t2" });
   });
 });

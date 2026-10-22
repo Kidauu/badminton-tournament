@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Pencil, RotateCcw } from "lucide-react";
+import { Pencil, RotateCcw, UserX } from "lucide-react";
 import { outcomeFromScores } from "../logic/scoring";
 import { scoreEditorMessage } from "../logic/scoreEditorMessage";
 import { useTournament } from "../state/TournamentContext";
@@ -54,6 +54,7 @@ function resultChipInfo(match: Match, teamsById: Map<string, Team>, viewer: bool
   if (!match.result) return { text: viewer ? "Belum main" : "Belum diisi", tone: "neutral" };
   if (match.result === "1-1") return { text: "Imbang 1–1", tone: "neutral" };
   const winnerLabel = `Tim ${teamsById.get(match.winnerTeamId!)?.seq ?? "?"}`;
+  if (match.isWalkover || match.isBye) return { text: `${winnerLabel} menang WO`, tone: "win" };
   if (match.stage === "semifinal") return { text: `${winnerLabel} ke final`, tone: "win" };
   if (match.stage === "final") return { text: `${winnerLabel} juara`, tone: "win" };
   if (match.stage === "third_place") return { text: `${winnerLabel} juara 3`, tone: "win" };
@@ -91,6 +92,12 @@ function ScoreEditorPanel({ match, teamALabel, teamBLabel, onClose }: ScoreEdito
   function resetScores() {
     setDraft(zeroDraft());
     firstInputRef.current?.focus();
+  }
+
+  function recordWalkover(winnerTeamId: string, winnerLabel: string) {
+    if (!window.confirm(`Tetapkan ${winnerLabel} menang WO? Hasilnya 2–0; untuk fase grup pemenang mendapat 3 poin, tetapi selisih poin tidak berubah.`)) return;
+    dispatch({ type: "RECORD_WALKOVER", matchId: match.id, winnerTeamId });
+    onClose();
   }
 
   function submit() {
@@ -181,6 +188,12 @@ function ScoreEditorPanel({ match, teamALabel, teamBLabel, onClose }: ScoreEdito
         </Button>
         <Button variant="secondary" icon={<RotateCcw size={16} />} onClick={resetScores}>
           Reset 0–0
+        </Button>
+        <Button variant="danger" icon={<UserX size={16} />} onClick={() => recordWalkover(match.teamAId!, teamALabel)}>
+          {teamALabel} menang WO
+        </Button>
+        <Button variant="danger" icon={<UserX size={16} />} onClick={() => recordWalkover(match.teamBId!, teamBLabel)}>
+          {teamBLabel} menang WO
         </Button>
         <Button variant="secondary" onClick={onClose}>
           Batal
